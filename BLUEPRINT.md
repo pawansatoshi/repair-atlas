@@ -1,5 +1,7 @@
 # RepairAtlas — Master Blueprint
 
+> **Implementation status snapshot — 2026-08-16:** The Bedrock → Lambda/API → CockroachDB embedding/persistence slice is verified for the tested repair memory, including 1024-dimensional storage, semantic retrieval, UUID validation, required-field validation, and safe nonexistent-memory handling. The complete agentic memory loop is **not yet verified**. Read `docs/HANDOFF_PROGRESS_2026-08-16.md` before continuing implementation.
+
 ## 1. Product thesis
 
 **RepairAtlas turns every completed repair into institutional memory that improves the next repair.**
@@ -158,14 +160,6 @@ What a technician actually did and what happened afterward.
 
 Normalized experience summary plus embedding, outcome, confidence, and source event.
 
-### `agent_actions`
-
-Agent activity and action results.
-
-### `audit_events`
-
-Security and governance trail.
-
 ## 9. Vector strategy
 
 Use CockroachDB vector capabilities for semantic retrieval while preserving relational scope.
@@ -187,6 +181,8 @@ agent reasoning
 ```
 
 Do not introduce Pinecone, Weaviate, Qdrant, Chroma, or another vector database unless a future requirement proves CockroachDB insufficient.
+
+**Verified implementation slice:** `repair_memories.embedding` is `VECTOR(1024)`, Titan Text Embeddings V2 returns 1024 dimensions, a real memory has been persisted, and CockroachDB vector-distance retrieval returns the expected repair memory.
 
 ## 10. Outcome-aware memory
 
@@ -220,6 +216,8 @@ Service manuals, equipment documentation, maintenance artifacts, and generated r
 
 The architecture should not use AWS as a compliance checkbox. Each AWS component has a visible job in the execution path.
 
+**Current verified path:** API Gateway → Lambda (`repair-atlas-bedrock`) → Amazon Bedrock Titan Text Embeddings V2 → CockroachDB. AgentCore Runtime and S3 are target architecture components and are not marked verified until directly exercised.
+
 ## 12. CockroachDB architecture
 
 ### Capability 1 — Distributed Vector Indexing
@@ -231,6 +229,8 @@ Provides semantic retrieval over repair experiences.
 Provides a governed MCP interface for agent/database interaction.
 
 The agent should have narrowly scoped permissions and should not receive unrestricted administrative access.
+
+**Current verification:** CockroachDB persistence and vector retrieval are proven for the tested repair-memory path. Managed MCP integration remains open.
 
 ## 13. Security model
 
@@ -324,47 +324,49 @@ failure
 
 Hard-coded demo results do not count.
 
+**Current status:** the persistence/embedding/retrieval building block is verified, but the complete closed loop above is still open.
+
 ## 17. Engineering quality gates
 
 ### Functional
 
-- fresh setup works
-- database connection works
-- vector retrieval works
-- agent works
-- MCP path works
-- memory persists
-- memory updates
-- AWS execution works
-- failure states are handled
+- [ ] fresh setup works
+- [x] database connection works for the verified Lambda path
+- [x] vector retrieval works for the tested repair-memory path
+- [ ] agent works end-to-end
+- [ ] MCP path works
+- [x] memory persists for the tested record
+- [ ] memory updates after outcome in the complete workflow
+- [x] AWS execution works for the verified embedding path
+- [x] tested API failure states are handled
 
 ### Security
 
-- no secrets in Git
-- least privilege
-- scoped DB credentials
-- constrained tools
-- approval boundaries
-- safe logging
+- [ ] no secrets in Git
+- [ ] least privilege
+- [ ] scoped DB credentials
+- [ ] constrained tools
+- [ ] approval boundaries
+- [ ] safe logging
 
 ### UX
 
-- desktop
-- tablet
-- mobile
-- loading states
-- empty states
-- error states
-- no overflow
-- keyboard/touch usability
+- [ ] desktop
+- [ ] tablet
+- [ ] mobile
+- [ ] loading states
+- [ ] empty states
+- [ ] error states
+- [ ] no overflow
+- [ ] keyboard/touch usability
 
 ### Reliability
 
-- model timeout handling
-- database error handling
-- retry policy
-- idempotent writes where appropriate
-- graceful degradation
+- [ ] model timeout handling
+- [ ] database error handling
+- [ ] retry policy
+- [ ] idempotent writes where appropriate
+- [ ] graceful degradation
 
 ## 18. Non-goals for the hackathon
 
