@@ -24,6 +24,8 @@ The repository was cloned into AWS CloudShell and the current application struct
 - AWS Amplify successfully completed a production deployment for the `main` branch. Amplify reported **Build completed successfully** and **Deployment complete**, with deployment status **Deployed**.
 - Amplify build logs verified the production sequence: dependency install, typecheck, lint, tests, `next build`, static-page generation, build artifact creation, artifact upload, and environment caching.
 - Amplify deployment details showed repository `pawansatoshi/repair-atlas`, branch `main`, and an Amplify-hosted branch domain.
+- The public Amplify website eventually became reachable after the earlier DNS propagation/accessibility issue; no manual DNS change was made during this debugging session.
+- Live production `/api/health` endpoint is reachable.
 
 ## Bugs / environment issues found
 
@@ -63,17 +65,29 @@ An initial push was rejected as non-fast-forward because the remote `main` branc
 
 ### 9. Amplify environment-variable validation rejected an AWS-prefixed variable
 
-During initial Amplify configuration, the console reported: `Environment variables cannot start with the reserved prefix "AWS"`. The configuration was reviewed and the final deployment subsequently completed successfully. The exact console-side state change that cleared this validation is not treated as independently verified; future edits must preserve Amplify's reserved-prefix rules and should verify the effective runtime environment after deployment.
+During initial Amplify configuration, the console reported: `Environment variables cannot start with the reserved prefix "AWS"`. `AWS_REGION` was removed from the Amplify environment-variable set because Amplify reserves the `AWS` prefix.
 
-### 10. Amplify public branch domain currently has a DNS accessibility issue
+### 10. Amplify public branch DNS propagation/access issue
 
-Amplify reports the deployment as **Deployed** and the deployment log ends with `Deployment complete`, but opening the displayed branch domain from the mobile browser returned:
+Amplify initially reported the deployment as **Deployed** while the displayed branch domain returned `DNS_PROBE_POSSIBLE`. The domain later became reachable without a manual DNS change during this session. Treat the earlier DNS failure as a transient propagation/accessibility finding, not an application-build failure.
 
-`This site can't be reached`  
-`DNS address could not be found`  
-`DNS_PROBE_POSSIBLE`
+### 11. Production runtime environment variables are not yet proven available
 
-This is currently classified as an **open deployment-access blocker**, not a build failure. The build, tests, artifact creation, and Amplify deployment itself are already proven. The next task is to verify the Amplify branch/domain configuration and DNS availability before changing hosting architecture or moving to Vercel.
+The live endpoint:
+
+`/api/health`
+
+returned:
+
+```json
+{"status":"ok","database":"not_configured","tablesReady":false,"vectorMemory":false,"bedrock":false,"embeddings":false,"mcp":false}
+```
+
+The user confirmed that `DATABASE_URL` was saved in Amplify app environment variables with the real CockroachDB connection string and All branches selected, and the app was redeployed. Despite this, `getPool()` still observed no usable `DATABASE_URL` in the live runtime. This is now the primary production configuration blocker.
+
+The code was hardened to support both direct `process.env.*` values and Amplify Gen 1-style `process.env.secrets` JSON-backed runtime secrets without exposing secret contents. A new `lib/env.ts` helper now resolves configuration from either source. `lib/db.ts`, `lib/bedrock.ts`, and `/api/health` were updated to use it. The health response now reports only safe booleans plus a non-secret runtime configuration source marker.
+
+The existing Bedrock client also already falls back to `us-east-1`, so `AWS_REGION` should not be required as a user-defined Amplify variable.
 
 ## Current evidence state
 
@@ -91,9 +105,16 @@ This is currently classified as an **open deployment-access blocker**, not a bui
 - Amplify production build
 - Amplify artifact creation/upload
 - Amplify deployment completion
+- Public Amplify website accessibility
+- Live `/api/health` route accessibility
 
 ### NOT YET PROVEN
 
+- Production runtime availability of `DATABASE_URL`
+- Production CockroachDB connectivity from Amplify
+- Production table/vector readiness
+- Real Bedrock reasoning from the Amplify runtime
+- Real Bedrock embedding generation from the Amplify runtime
 - Complete agent orchestration
 - Evidence-based diagnosis/recommendation through the real product path
 - Human approval boundary through the full workflow
@@ -103,33 +124,32 @@ This is currently classified as an **open deployment-access blocker**, not a bui
 - Second incident retrieving newly learned memory
 - CockroachDB Managed MCP Server end-to-end use
 - AgentCore Runtime end-to-end verification
-- Production UI readiness
 - Full security/reliability gate
 - Final golden demo
 - Final submission package
-- Public Amplify URL accessibility/DNS
 
 ## Do not repeat unnecessarily
 
-Do **not** rerun the already-proven embedding persistence tests unless a code/deployment change creates a regression risk. The next engineering effort should move toward the complete agentic memory loop after the Amplify public-domain blocker is resolved.
+Do **not** rerun the already-proven embedding persistence tests unless a code/deployment change creates a regression risk. The immediate engineering effort is the Amplify production runtime configuration path; once that is green, move directly to the complete agentic memory loop.
 
 ## Next execution order
 
 ```text
-1. Resolve/verify Amplify branch-domain DNS/accessibility
-2. Audit current API/agent code against the roadmap
-3. Connect real repair-memory retrieval to agent reasoning
-4. Implement/verify recommendation evidence
-5. Implement explicit approval boundary
-6. Implement work-order + outcome writes
-7. Persist outcome as durable memory
-8. Run a second differently-worded incident and prove learned-memory reuse
-9. Verify MCP path and permissions
-10. Verify AgentCore Runtime if retained in the architecture
-11. Build/audit UI
-12. Run security + reliability gates
-13. Capture golden demo evidence
-14. Final submission audit
+1. Deploy/verify the new runtime-env compatibility patch
+2. Re-run live /api/health
+3. Prove DATABASE_URL reaches the Amplify runtime without exposing its value
+4. Verify CockroachDB connection, tables, and vector index
+5. Verify Bedrock runtime configuration and live reasoning/embedding calls
+6. Verify CockroachDB MCP path and permissions
+7. Verify AgentCore Runtime if retained in the architecture
+8. Connect real repair-memory retrieval to agent reasoning
+9. Verify explicit approval boundary
+10. Verify work-order + outcome writes
+11. Persist outcome as durable memory
+12. Run a second differently-worded incident and prove learned-memory reuse
+13. Run security + reliability gates
+14. Capture golden demo evidence
+15. Final submission audit
 ```
 
 ## Evidence rule
