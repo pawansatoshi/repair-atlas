@@ -1,5 +1,25 @@
 # RepairAtlas Architecture
 
+## Implementation status — 2026-08-16
+
+The following execution slice is directly verified in the deployed environment:
+
+```text
+API Gateway HTTP API
+      ↓ POST /embed
+AWS Lambda: repair-atlas-bedrock
+      ↓
+Amazon Bedrock Titan Text Embeddings V2
+      ↓ 1024-dimensional vector
+CockroachDB Cloud repair_memories.embedding
+      ↓
+Persistent vector retrieval
+```
+
+Verified evidence includes successful remote invocation, UUID/input validation, real-memory embedding persistence, direct CockroachDB verification (`has_embedding = true`, `dimensions = 1024`), vector-distance retrieval, and safe 404 handling for a nonexistent valid UUID.
+
+The diagrams below describe the **target product architecture**. AgentCore Runtime, Managed MCP, the full agent loop, UI, and approval/work-order workflow must still be exercised and verified before they can be marked production-complete.
+
 ## System objective
 
 RepairAtlas is a stateful agentic field-operations application where **CockroachDB is the operational system of record and persistent semantic memory**, while AWS provides the production application hosting, model inference, and agent runtime.
@@ -46,21 +66,34 @@ flowchart TB
     APPROVAL --> API
 ```
 
-### Responsibility split
+### Verified development execution path
 
-| Component | Responsibility | Why it exists |
+```mermaid
+flowchart LR
+    CLIENT[HTTP Client / future UI] --> APIGW[AWS API Gateway\nPOST /embed]
+    APIGW --> LAMBDA[AWS Lambda\nrepair-atlas-bedrock]
+    LAMBDA --> TITAN[Amazon Titan Text Embeddings V2\n1024 dimensions]
+    LAMBDA --> CRDB[(CockroachDB Cloud\nrepair_memories)]
+    CRDB --> RET[Vector-distance retrieval]
+```
+
+## Responsibility split
+
+| Component | Responsibility | Status |
 |---|---|---|
-| **AWS Amplify Hosting** | Hosts the production Next.js application | Required AWS deployment and reliable public demo surface |
-| **Next.js server API** | Validation, organization/asset authorization, approval workflow | Keeps secrets and authorization server-side |
-| **Amazon Bedrock AgentCore Runtime** | Executes the bounded repair agent | Production agent runtime and observability |
-| **Amazon Bedrock** | Reasoning over current incident + retrieved evidence | Model inference for diagnosis/recommendation |
-| **Amazon Titan Text Embeddings V2** | Embeds incident/memory text into 1,024-dimensional vectors | Semantic memory representation |
-| **CockroachDB Cloud** | Transactional source of truth + persistent memory | One durable system of record; no second vector database |
-| **CockroachDB Distributed Vector Indexing** | Similarity retrieval over repair memories | Native semantic retrieval inside CockroachDB |
-| **CockroachDB Managed MCP Server** | Governed agent/database interface | Explicit CockroachDB agent integration |
-| **Human approval boundary** | Approves consequential actions | Prevents autonomous high-impact writes |
+| **AWS Amplify Hosting** | Hosts the production Next.js application | Target / not yet verified in this handoff |
+| **Next.js server API** | Validation, organization/asset authorization, approval workflow | Target / not yet verified in this handoff |
+| **Amazon Bedrock AgentCore Runtime** | Executes the bounded repair agent | Target / not yet verified |
+| **Amazon Bedrock** | Reasoning over current incident + retrieved evidence | Embedding path verified; full reasoning path open |
+| **Amazon Titan Text Embeddings V2** | Embeds incident/memory text into 1,024-dimensional vectors | VERIFIED |
+| **CockroachDB Cloud** | Transactional source of truth + persistent memory | Persistence/retrieval path VERIFIED |
+| **CockroachDB Distributed Vector Indexing** | Similarity retrieval over repair memories | Vector retrieval VERIFIED; index usage/performance proof open |
+| **CockroachDB Managed MCP Server** | Governed agent/database interface | Not yet verified |
+| **Human approval boundary** | Approves consequential actions | Target / not yet verified |
+| **AWS Lambda** | Current deployed embedding persistence adapter | VERIFIED |
+| **AWS API Gateway HTTP API** | Current deployed `/embed` endpoint | VERIFIED |
 
-The MVP deliberately does **not** introduce EC2, RDS, DynamoDB, Lambda, or S3 merely to increase AWS service count. Each infrastructure component must have a clear product role and must not weaken CockroachDB's role as the persistent memory layer.
+The MVP deliberately does **not** introduce EC2, RDS, DynamoDB, Lambda, or S3 merely to increase AWS service count. The current Lambda exists because it is the verified embedding persistence adapter; any additional infrastructure must have a clear product role and must not weaken CockroachDB's role as the persistent memory layer.
 
 ## Golden end-to-end path
 
@@ -87,6 +120,8 @@ flowchart LR
 The winning proof point is not a chat response. It is the **closed memory loop**:
 
 **incident → retrieval → reasoning → approval → work order → repair outcome → durable memory → future retrieval**.
+
+**Current status:** only the embedding/persistence/retrieval building block is verified; the complete closed loop remains open.
 
 ## Agent lifecycle
 
@@ -233,7 +268,7 @@ Escalate to the technician instead of manufacturing certainty.
 
 ## AWS deployment path
 
-The production path is intentionally small:
+### Target production path
 
 ```text
 GitHub main
@@ -251,7 +286,19 @@ CockroachDB Managed MCP
 CockroachDB Cloud
 ```
 
-The AWS integration is meaningful at three distinct layers:
+### Currently verified deployed path
+
+```text
+AWS API Gateway HTTP API
+    ↓
+AWS Lambda: repair-atlas-bedrock
+    ↓
+Amazon Bedrock Titan Text Embeddings V2
+    ↓
+CockroachDB Cloud
+```
+
+The AWS integration is meaningful at three distinct target layers:
 
 1. **Amplify** — public production hosting for the application.
 2. **AgentCore Runtime** — execution and observability for the bounded agent.
@@ -274,9 +321,9 @@ Do not add infrastructure merely for architectural complexity or AWS service cou
 
 ## Current architecture decision
 
-Use **Amazon Bedrock AgentCore Runtime** rather than Bedrock Agents Classic for new development. AgentCore is the current AWS agent-runtime path used by this project.
+Use **Amazon Bedrock AgentCore Runtime** rather than Bedrock Agents Classic for new development. AgentCore is the current AWS agent-runtime path used by the target architecture.
 
-The architecture's source of truth is:
+The architecture's intended source of truth is:
 
 **CockroachDB = operational state + persistent memory**
 
@@ -287,3 +334,5 @@ The architecture's source of truth is:
 **Bedrock = reasoning + embeddings**
 
 **Human approval = consequential-action boundary**
+
+The currently proven implementation is a smaller subset of this target architecture and must not be represented as fully complete until the remaining runtime, MCP, UI, security, and end-to-end loop gates are verified.
