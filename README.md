@@ -161,6 +161,16 @@ The UI is designed for mobile, tablet, laptop and desktop without browser deskto
 - External model output is treated as untrusted input.
 - Errors do not expose stack traces or credentials.
 
+## Debugging and verification record
+
+The dated verification record is maintained in `docs/DEBUGGING_LOG_2026-08-16.md`.
+
+Important findings already resolved include CloudShell dependency/tooling issues, filesystem pressure during dependency installation, missing Git author identity, GitHub HTTPS password-authentication failure, remote non-fast-forward synchronization, and the original embedding UUID validation/persistence defect.
+
+The current AWS deployment finding is different: **Amplify build and deployment are successful, but the displayed public branch domain currently returns a DNS resolution error in the tested mobile browser.** This is an open deployment-access verification item, not evidence of a failed build. Vercel is not required while the AWS Amplify path is being validated.
+
+The repository deliberately distinguishes verified PASS states from unresolved/untested states; see the debugging log before repeating tests or changing architecture.
+
 ## Demo discipline
 
 The final hackathon demo must show **real persistence and the real memory loop**. Hard-coded results are only fallback/demo evidence and are explicitly labeled. The submission video must show the project functioning and show CockroachDB memory at work, as required by the official rules.
@@ -175,9 +185,12 @@ Submission deadline: **August 18, 2026 at 5:00 PM EDT**.
 
 **Database foundation:** verified against CockroachDB Cloud.  
 **Application integration:** implemented in repository.  
-**AWS deployment:** not yet verified.  
-**Live Bedrock/AgentCore:** not yet verified.  
-**Final release:** **NOT READY** until AWS deployment, real cloud interaction, production telemetry, video, and the final QA/release gate are verified.
+**Local automated quality gates:** verified — typecheck, lint, tests (4/4), and Next.js production build pass.  
+**AWS Amplify build:** verified successful.  
+**AWS Amplify deployment:** verified successful; Amplify reports `Deployed` and `Deployment complete`.  
+**Public Amplify URL:** **NOT YET VERIFIED** — current mobile-browser test returned `DNS_PROBE_POSSIBLE`.  
+**Live Bedrock/AgentCore full-loop:** not yet verified.  
+**Final release:** **NOT READY** until public access, real end-to-end cloud interaction, production telemetry, video, and the final QA/release gate are verified.
 
 ## License
 
