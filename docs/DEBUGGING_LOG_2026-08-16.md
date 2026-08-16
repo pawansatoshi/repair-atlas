@@ -71,7 +71,7 @@ During initial Amplify configuration, the console reported: `Environment variabl
 
 Amplify initially reported the deployment as **Deployed** while the displayed branch domain returned `DNS_PROBE_POSSIBLE`. The domain later became reachable without a manual DNS change during this session. Treat the earlier DNS failure as a transient propagation/accessibility finding, not an application-build failure.
 
-### 11. Production runtime environment variables are not yet proven available
+### 11. Amplify Next.js SSR environment variables were only configured at the Amplify app level
 
 The live endpoint:
 
@@ -83,11 +83,29 @@ returned:
 {"status":"ok","database":"not_configured","tablesReady":false,"vectorMemory":false,"bedrock":false,"embeddings":false,"mcp":false}
 ```
 
-The user confirmed that `DATABASE_URL` was saved in Amplify app environment variables with the real CockroachDB connection string and All branches selected, and the app was redeployed. Despite this, `getPool()` still observed no usable `DATABASE_URL` in the live runtime. This is now the primary production configuration blocker.
+The user confirmed that `DATABASE_URL` was saved in Amplify app environment variables with the real CockroachDB connection string and All branches selected, and the app was redeployed. Despite this, `process.env.DATABASE_URL` was unavailable to the Next.js server runtime.
 
-The code was hardened to support both direct `process.env.*` values and Amplify Gen 1-style `process.env.secrets` JSON-backed runtime secrets without exposing secret contents. A new `lib/env.ts` helper now resolves configuration from either source. `lib/db.ts`, `lib/bedrock.ts`, and `/api/health` were updated to use it. The health response now reports only safe booleans plus a non-secret runtime configuration source marker.
+AWS's current Amplify documentation explicitly states that app environment variables are available to the build, but Next.js server-side runtime does not receive them by default. AWS recommends bridging selected variables into a `.env.production` file during the build so the deployed Next.js server can access them. citeturn482149search0turn482149search1
 
-The existing Bedrock client also already falls back to `us-east-1`, so `AWS_REGION` should not be required as a user-defined Amplify variable.
+### 12. Runtime environment compatibility hardening
+
+A `lib/env.ts` helper was added to resolve configuration from either direct `process.env.*` or Amplify Gen 1-style `process.env.secrets` JSON. `lib/db.ts`, `lib/bedrock.ts`, and `/api/health` were updated to use the helper. The health response now exposes only safe configuration-presence booleans and a non-secret runtime configuration source marker.
+
+### 13. Amplify SSR environment bridge patch
+
+`amplify.yml` was updated so that, immediately before `next build`, the build environment copies only the required server-side configuration variables into `.env.production`:
+
+- `DATABASE_URL`
+- `DATABASE_SSL`
+- `DB_POOL_MAX`
+- `DEMO_ORG_ID`
+- `BEDROCK_MODEL_ID`
+- `BEDROCK_EMBED_MODEL_ID`
+- `COCKROACH_MCP_URL`
+
+This follows AWS's documented SSR approach for making selected Amplify build variables available to the Next.js server runtime. citeturn482149search0
+
+**Security note:** AWS warns that credentials written into `.env.production` can be present in deployment artifacts and therefore should be handled carefully. This is a temporary hackathon-path compatibility fix; before final production hardening, move sensitive database/MCP credentials to the appropriate secret mechanism rather than broadly exposing them in build artifacts. citeturn482149search0
 
 ## Current evidence state
 
@@ -110,7 +128,7 @@ The existing Bedrock client also already falls back to `us-east-1`, so `AWS_REGI
 
 ### NOT YET PROVEN
 
-- Production runtime availability of `DATABASE_URL`
+- Production runtime availability of `DATABASE_URL` after the new SSR environment bridge deployment
 - Production CockroachDB connectivity from Amplify
 - Production table/vector readiness
 - Real Bedrock reasoning from the Amplify runtime
@@ -135,7 +153,7 @@ Do **not** rerun the already-proven embedding persistence tests unless a code/de
 ## Next execution order
 
 ```text
-1. Deploy/verify the new runtime-env compatibility patch
+1. Wait for Amplify to deploy the SSR environment bridge patch
 2. Re-run live /api/health
 3. Prove DATABASE_URL reaches the Amplify runtime without exposing its value
 4. Verify CockroachDB connection, tables, and vector index
