@@ -1,15 +1,17 @@
 # RepairAtlas on Amazon Bedrock AgentCore
 
-`repair_agent.py` is the bounded runtime agent. It reads scoped repair memory from CockroachDB and uses Amazon Bedrock for recommendation generation. Consequential writes remain outside the autonomous read/reason path and are gated by the application approval workflow.
+`repair_agent.py` is the bounded runtime agent. It uses Amazon Bedrock to embed the current incident, retrieves scoped repair memories from CockroachDB's vector index, and uses Bedrock reasoning to produce a recommendation. Consequential writes remain outside the autonomous read/reason path and are gated by the web application's approval workflow.
 
 ## Local requirements
 
-- Python 3.10+
-- AWS credentials with least-privilege Bedrock permissions
+- Node.js 20+ for the AgentCore CLI
+- Python 3.12+
+- AWS credentials with least-privilege Bedrock and AgentCore permissions
 - `DATABASE_URL`
 - `BEDROCK_MODEL_ID`
+- `BEDROCK_EMBED_MODEL_ID` (defaults to `amazon.titan-embed-text-v2:0` in the agent)
 
-## Run locally
+## Local runtime
 
 ```bash
 python -m venv .venv
@@ -20,14 +22,24 @@ python repair_agent.py
 
 ## AgentCore deployment
 
-Use the current AgentCore CLI workflow:
+Amazon's current AgentCore CLI scaffolds and deploys the runtime through AWS CDK. The supported workflow is:
 
 ```bash
 npm install -g @aws/agentcore
-agentcore create --protocol MCP
+agentcore create
+agentcore dev
+agentcore deploy --plan
 agentcore deploy
+agentcore status
+agentcore invoke --prompt "Diagnose PRESS-204 overheating after extended operation"
 ```
 
-For the current AWS runtime contract, the runtime uses a containerized agent and supports MCP/HTTP invocation. Keep the runtime IAM role narrowly scoped to the required Bedrock and database resources.
+For a new project, choose a Python agent, Bedrock as the model provider, and the protocol appropriate to the runtime integration. Copy the bounded `repair_agent.py` implementation into the generated agent project and configure its environment variables/IAM role before deployment.
 
-Do not commit credentials or runtime tokens.
+The deployed runtime should have only the permissions it needs for Bedrock invocation and scoped CockroachDB access. Enable AgentCore/CloudWatch observability before the final demo and review runtime logs and traces after deployment.
+
+## Memory contract
+
+The agent retrieves only records matching the configured organization and asset. The vector dimension is fixed at 1024 to match Amazon Titan Text Embeddings V2's default output and the CockroachDB `VECTOR(1024)` column. Similarity ranking is performed by CockroachDB; the model does not invent historical records.
+
+Do not commit credentials, runtime tokens, database passwords, or generated AWS configuration containing secrets.
