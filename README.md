@@ -6,58 +6,62 @@ RepairAtlas is an agentic field-operations console that turns completed repairs 
 
 Built for the **CockroachDB × AWS Hackathon — Build with Agentic Memory**.
 
-## The closed loop
+## Why this can win
+
+RepairAtlas treats memory as operational infrastructure, not chat history:
 
 ```text
 Current failure
       ↓
 Asset context
       ↓
-CockroachDB semantic memory retrieval
+CockroachDB vector memory
       ↓
-Outcome-aware agent reasoning
+Outcome-aware Bedrock reasoning
       ↓
-Human approval for consequential action
+Human approval boundary
       ↓
-Work-order / repair action
+Work order / repair action
       ↓
 Technician outcome
       ↓
-Durable repair memory
+Audited repair event
+      ↓
+Durable vector memory
       ↓
 Future incident
 ```
 
-This is intentionally **not** a generic chatbot or chat-history demo.
+The same CockroachDB system of record holds transactional state, repair events, audit events, and semantic memory. That makes the memory loop demonstrable rather than a mock UI.
 
 ## Hackathon architecture
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| Product UI | Next.js + React | Responsive operations console |
-| Agent reasoning | Amazon Bedrock | Diagnostic recommendation |
-| Agent runtime | Amazon Bedrock AgentCore Runtime | Isolated, observable production execution |
-| System of record | CockroachDB Cloud | Transactional operational state + memory |
-| Semantic memory | CockroachDB Vector Indexing | Similarity retrieval without a second vector DB |
+| Product UI + APIs | Next.js 15 + React 19 | Responsive operations console and server APIs |
+| Agent reasoning | Amazon Bedrock | Bounded diagnostic recommendation |
+| Agent runtime | Amazon Bedrock AgentCore Runtime | AWS-hosted agent execution and observability |
+| System of record | CockroachDB Cloud | Transactional operational state + durable memory |
+| Semantic memory | CockroachDB Distributed Vector Indexing | Similarity retrieval without a second vector database |
 | Agent/database interface | CockroachDB Managed MCP Server | Governed AI access to CockroachDB |
-| Documents | Amazon S3 | Manuals and maintenance artifacts |
+| Hosting | AWS Amplify Hosting | AWS-hosted Next.js application |
 
-CockroachDB's current vector indexing supports similarity search alongside transactional data, while its managed MCP server provides hosted, RBAC-controlled agent access with read-only-by-default behavior and explicit write consent.
+The project deliberately uses two CockroachDB capabilities required by the challenge: the Managed MCP Server and Distributed Vector Indexing. The application also uses CockroachDB as the transactional source of truth for work orders, repair events, agent actions, audit events, and memories.
 
-Amazon Bedrock AgentCore Runtime is the intended production execution path for the agent layer, providing session isolation, observability and MCP support.
+Amazon Titan Text Embeddings V2 produces 1,024-dimensional vectors, matching `VECTOR(1024)` in the schema. Similarity computation and retrieval remain in CockroachDB. citeturn1search3turn3search1
 
 ## Golden scenario
 
 **Asset:** `PRESS-204`  
 **Symptom:** overheating after extended operation.
 
-The agent retrieves three relevant experiences:
+The agent can retrieve three relevant experiences:
 
 1. A successful airflow/filter intervention.
 2. A failed fan replacement.
 3. Another successful intake/filter intervention.
 
-It recommends checking airflow before replacing the motor, explains the evidence, and requires approval before creating a diagnostic work order. After the technician records the outcome, that experience is written back as durable memory.
+It recommends checking airflow before replacing the motor, explains the evidence, and requires explicit approval before creating a diagnostic work order. The technician outcome becomes a repair event and durable memory, closing the learning loop.
 
 ## Run locally
 
@@ -76,45 +80,60 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-Without cloud credentials the UI runs in **bounded demo mode**. It does not pretend that live database or Bedrock calls occurred. Configure the environment variables to activate the real integrations.
+Without cloud credentials the UI runs in **bounded demo mode**. It never claims that live database or Bedrock calls occurred when they did not.
 
 ## CockroachDB setup
 
-Run `database/schema.sql` against a dedicated application database using a least-privilege SQL role.
+Run `database/schema.sql` against the dedicated application database using a least-privilege SQL role.
 
-Required production path:
+Production path:
 
 - CockroachDB transactional state
-- CockroachDB vector index on `repair_memories.embedding`
-- CockroachDB Managed MCP Server at `https://cockroachlabs.cloud/mcp`
-- scoped authentication/RBAC
-- explicit consent for writes
+- CockroachDB `VECTOR(1024)` memory
+- Distributed vector index
+- CockroachDB Managed MCP Server
+- organization/asset scoping
+- explicit approval for consequential writes
+- append-oriented repair and audit history
 
-The example MCP configuration is in `.mcp.json.example`. Use the exact authentication snippet generated by CockroachDB Cloud Console and never commit a credential.
+The MCP configuration example is in `.mcp.json.example`. Use the exact authentication snippet generated by CockroachDB Cloud Console and never commit a credential.
 
-## AWS setup
+## AWS deployment path
 
-Set:
+The hackathon requires the project to be deployed on AWS and to use at least one AWS service. The repository contains an AWS Amplify Hosting build specification for the Next.js application and an Amazon Bedrock AgentCore runtime implementation.
+
+AWS Amplify currently documents Next.js SSR deployment through its managed compute provider; this repository pins Next.js to the supported 15.x line for the AWS deployment path. citeturn1search1turn1search8
+
+For the AWS deployment, connect this GitHub repository to Amplify Hosting, configure the server-side environment variables/secrets, deploy the branch, then deploy and verify the AgentCore runtime. AWS documents Git-connected Next.js deployment and environment-variable configuration in Amplify. citeturn1search4turn1search6
+
+Required runtime configuration includes:
 
 ```text
-AWS_REGION=
+DATABASE_URL=
+DATABASE_SSL=true
+DEMO_ORG_ID=demo-org
+AWS_REGION=us-east-1
 BEDROCK_MODEL_ID=
-BEDROCK_EMBED_MODEL_ID=
+BEDROCK_EMBED_MODEL_ID=amazon.titan-embed-text-v2:0
+COCKROACH_MCP_URL=https://cockroachlabs.cloud/mcp
 ```
 
-The web API uses Bedrock for embeddings and reasoning when configured. The AgentCore implementation is under `agentcore/` and its deployment workflow is documented in `agentcore/README.md`.
+Do not place secrets in source control. Use the AWS deployment console/secret mechanism for sensitive values.
 
-Keep IAM permissions narrowly scoped to the required Bedrock, database and storage operations.
+## AgentCore
+
+The bounded agent is in `agentcore/repair_agent.py`. It embeds the incident with Bedrock, retrieves asset-scoped vector memory from CockroachDB, and asks Bedrock for a bounded recommendation. The current AWS AgentCore CLI workflow is documented in `agentcore/README.md`. AWS documents `agentcore create`, `agentcore dev`, `agentcore deploy`, `agentcore status`, and `agentcore invoke` as the current workflow. citeturn4search0turn4search6
 
 ## API surface
 
-- `GET /api/health` — production health/dependency status.
-- `POST /api/memories` — scoped semantic retrieval.
-- `POST /api/diagnose` — bounded diagnostic reasoning.
-- `POST /api/work-orders` — approval-gated work-order creation.
-- `POST /api/outcomes` — durable repair outcome/memory persistence.
+- `GET /api/health` — database/schema/vector/Bedrock/MCP readiness.
+- `POST /api/memories` — scoped semantic retrieval endpoint.
+- `POST /api/diagnose` — asset-scoped memory retrieval + bounded reasoning.
+- `POST /api/work-orders` — approval-gated, audited work-order creation.
+- `POST /api/outcomes` — audited repair event + durable memory persistence.
+- `GET /api/mcp` — managed MCP configuration/reachability check when credentials are configured.
 
-All APIs validate input server-side and return safe error messages.
+All write APIs validate input server-side, enforce organization/asset boundaries, use safe error responses, and avoid exposing stack traces or credentials.
 
 ## Product quality standard
 
@@ -129,27 +148,36 @@ This repository follows:
 - `templates/SECURITY_SPEC_TEMPLATE.md`
 - `templates/PERFORMANCE_SPEC_TEMPLATE.md`
 
-The UI is designed for mobile, tablet, laptop and desktop without requiring browser desktop mode. It uses semantic HTML, visible focus states, responsive layout, reduced-motion support, intentional loading/error/empty states and a touch-friendly mobile navigation.
+The UI is designed for mobile, tablet, laptop and desktop without browser desktop mode. It includes semantic structure, visible keyboard focus, reduced-motion support, touch-friendly mobile navigation, loading/error/empty states, and bounded approval UX.
 
 ## Security principles
 
 - No secrets in source control.
-- No client-trusted authorization.
-- Consequential agent writes require approval.
-- No unrestricted administrative SQL.
-- Repair/audit history is append-oriented.
+- No client-trusted organization authorization.
+- Consequential agent writes require explicit approval.
+- Asset IDs are validated against the server-side organization.
+- Repair outcomes are linked to repair events and work orders.
+- Agent actions and consequential writes are audited.
 - External model output is treated as untrusted input.
 - Errors do not expose stack traces or credentials.
 
 ## Demo discipline
 
-The hackathon demo must show real persistence and a real memory loop. Hard-coded results do not count as evidence. When cloud integrations are unavailable, the product labels itself as demo mode rather than fabricating connectivity.
+The final hackathon demo must show **real persistence and the real memory loop**. Hard-coded results are only fallback/demo evidence and are explicitly labeled. The submission video must show the project functioning and show CockroachDB memory at work, as required by the official rules. citeturn0search0
+
+## Hackathon submission checklist
+
+The official submission requires a public repository, functional demo URL, English text description/testing instructions, a public video under three minutes, identification of CockroachDB and AWS tools used, and a project deployed on AWS. citeturn0search0
+
+Submission deadline: **August 18, 2026 at 5:00 PM EDT**. citeturn0search1
 
 ## Status
 
-**Implementation:** MVP application foundation complete.  
-**Live cloud integrations:** require project credentials and deployment configuration.  
-**Final release:** not yet claimed until the full QA/release protocol has been executed against the deployed environment.
+**Database foundation:** verified against CockroachDB Cloud.  
+**Application integration:** implemented in repository.  
+**AWS deployment:** not yet verified.  
+**Live Bedrock/AgentCore:** not yet verified.  
+**Final release:** **NOT READY** until AWS deployment, real cloud interaction, production telemetry, video, and the final QA/release gate are verified.
 
 ## License
 
