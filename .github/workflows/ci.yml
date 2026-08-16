@@ -18,13 +18,24 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Install
         run: npm install
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
-        run: npm run lint
+        run: |
+          npm run lint -- --format json > lint-report.json || {
+            cat lint-report.json
+            exit 1
+          }
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: lint-report.json
+          if-no-files-found: ignore
       - name: Smoke tests
         run: npm test
       - name: Production build
