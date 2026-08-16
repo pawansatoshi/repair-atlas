@@ -22,31 +22,66 @@ export default function Home(){
   const [approved,setApproved]=useState(false);
   const [outcome,setOutcome]=useState(false);
   const [tab,setTab]=useState('overview');
+  const [diagnosis,setDiagnosis]=useState('Inspect intake airflow and filter condition before replacing the motor.');
+  const [busy,setBusy]=useState(false);
+  const [message,setMessage]=useState('');
   const filtered=useMemo(()=>memories.filter(m=>`${m.title} ${m.copy}`.toLowerCase().includes(query.toLowerCase().split(' ')[0]||'x')||query.includes('PRESS-204')),[query]);
-  const runDiagnosis=()=>{setApproved(false);setOutcome(false)};
+
+  async function runDiagnosis(){
+    setBusy(true); setMessage(''); setApproved(false); setOutcome(false);
+    try{
+      const response=await fetch('/api/diagnose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assetId:'PRESS-204',symptom:query})});
+      const data=await response.json();
+      if(!response.ok) throw new Error(data.error||'Diagnosis unavailable');
+      setDiagnosis(data.recommendation||diagnosis); setMessage(data.mode==='bedrock'?'Live Bedrock reasoning completed.':'Bounded demo reasoning active.');
+    }catch(error){setMessage(error instanceof Error?error.message:'Diagnosis unavailable');}
+    finally{setBusy(false);}
+  }
+
+  async function approveAction(){
+    setBusy(true); setMessage('');
+    try{
+      const response=await fetch('/api/work-orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approved:true,assetId:'PRESS-204'})});
+      const data=await response.json();
+      if(!response.ok) throw new Error(data.error||'Unable to create work order');
+      setApproved(true); setMessage(`${data.mode==='cockroachdb'?'CockroachDB':'Demo'} work order ${data.id} staged.`);
+    }catch(error){setMessage(error instanceof Error?error.message:'Unable to create work order');}
+    finally{setBusy(false);}
+  }
+
+  async function recordOutcome(){
+    setBusy(true); setMessage('');
+    try{
+      const response=await fetch('/api/outcomes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assetId:'PRESS-204',outcome:'resolved',summary:'Intake obstruction confirmed. Airflow path cleared and filter replaced; overheating resolved without motor replacement.'})});
+      const data=await response.json();
+      if(!response.ok) throw new Error(data.error||'Unable to persist outcome');
+      setOutcome(true); setMessage(`${data.mode==='cockroachdb'?'CockroachDB':'Demo'} repair memory persisted.`);
+    }catch(error){setMessage(error instanceof Error?error.message:'Unable to persist outcome');}
+    finally{setBusy(false);}
+  }
+
   return <div className="app">
     <header className="topbar"><div className="brand"><div className="mark">R</div><span>RepairAtlas</span></div><div className="status"><span className="dot"/>Memory system ready <span className="pill">CockroachDB</span></div></header>
     <div className="shell">
       <aside className="sidebar" aria-label="Primary navigation">
         <div className="nav-title">Operations</div>
         {['overview','work orders','memory','assets'].map(x=><button key={x} className={`nav-btn ${tab===x?'active':''}`} onClick={()=>setTab(x)} aria-current={tab===x?'page':undefined}><span aria-hidden="true">{x==='overview'?'◈':x==='work orders'?'□':x==='memory'?'◌':'◇'}</span><span>{x}</span></button>)}
-        <div className="nav-title">System</div><button className="nav-btn" onClick={()=>alert('System health: application ready. Live integrations are enabled when production credentials are configured.')}><span aria-hidden="true">●</span><span>Health</span></button>
+        <div className="nav-title">System</div><button className="nav-btn" onClick={()=>setTab('health')}><span aria-hidden="true">●</span><span>Health</span></button>
       </aside>
       <main className="main">
-        <section className="hero"><div><div className="eyebrow">Agentic field intelligence</div><h1>Every repair teaches the next one.</h1><p>RepairAtlas turns field experience into durable operational memory. The agent retrieves what worked before, explains why, and proposes the next safe action.</p></div><div className="hero-actions"><button className="btn" onClick={()=>document.getElementById('memory')?.scrollIntoView({behavior:'smooth'})}>View memory</button><button className="btn primary" onClick={runDiagnosis}>Run diagnosis</button></div></section>
+        <section className="hero"><div><div className="eyebrow">Agentic field intelligence</div><h1>Every repair teaches the next one.</h1><p>RepairAtlas turns field experience into durable operational memory. The agent retrieves what worked before, explains why, and proposes the next safe action.</p></div><div className="hero-actions"><button className="btn" onClick={()=>document.getElementById('memory')?.scrollIntoView({behavior:'smooth'})}>View memory</button><button className="btn primary" onClick={runDiagnosis} disabled={busy}>{busy?'Reasoning…':'Run diagnosis'}</button></div></section>
+        {message&&<div role="status" className="pill" style={{marginBottom:14,padding:'9px 12px'}}>{message}</div>}
         <section className="grid">
           <div className="card">
             <div className="card-head"><div><div className="card-title">Active incident</div><div className="muted" style={{fontSize:12,marginTop:4}}>Work order WO-2048 · Open</div></div><span className="pill good">Live workflow</span></div>
             <div className="asset"><div className="asset-top"><div><div className="eyebrow">Asset</div><h2>PRESS-204</h2><div className="muted" style={{fontSize:13,marginTop:5}}>Hydraulic press · Site 07 · Line B</div></div><span className="pill">Overheating</span></div>
-              <div className="metrics"><div className="metric"><span className="muted" style={{fontSize:11}}>Current temp</span><strong>92°C</strong></div><div className="metric"><span className="muted" style={{fontSize:11}}>Runtime</span><strong>6h 18m</strong></div><div className="metric"><span className="muted" style={{fontSize:11}}>Memory hits</span><strong>3</strong></div></div>
+              <div className="metrics"><div className="metric"><span className="muted" style={{fontSize:11}}>Current temp</span><strong>92°C</strong></div><div className="metric"><span className="muted" style={{fontSize:11}}>Runtime</span><strong>6h 18m</strong></div><div className="metric"><span className="muted" style={{fontSize:11}}>Memory hits</span><strong>{filtered.length}</strong></div></div>
             </div>
             <div className="card-head"><div className="card-title">Diagnostic workflow</div><span className="pill">Agent supervised</span></div>
-            <div className="timeline">
-              {logs.map(([a,b],i)=><div className="timeline-item" key={a}><div className="rail"><div className="node"/></div><div><div className="event-title">{i+1}. {a}</div><div className="event-copy">{b}</div></div></div>)}
-            </div>
-            <div className="agent"><div className="agent-state"><span className="dot"/><div><strong style={{fontSize:13}}>Recommendation ready</strong><div className="muted" style={{fontSize:12,marginTop:3}}>Inspect intake airflow and filter condition before replacing the motor.</div></div></div>
-              <div className="approval"><h3>Approval required · Create diagnostic work order</h3><p>This action changes operational state. RepairAtlas keeps consequential writes behind a human approval boundary.</p><div className="actions"><button className="btn primary" onClick={()=>setApproved(true)} disabled={approved}>{approved?'Approved':'Approve action'}</button><button className="btn" onClick={()=>setApproved(false)}>Review</button></div></div>
-              {approved&&<div className="approval" style={{marginTop:10,borderColor:'rgba(116,215,176,.25)',background:'rgba(116,215,176,.05)'}}><h3>Diagnostic work order created</h3><p>WO-2049 is staged. Record the technician outcome to turn this experience into durable memory.</p><div className="actions"><button className="btn primary" onClick={()=>setOutcome(true)}>{outcome?'Outcome recorded':'Record successful repair'}</button></div></div>}
+            <div className="timeline">{logs.map(([a,b],i)=><div className="timeline-item" key={a}><div className="rail"><div className="node"/></div><div><div className="event-title">{i+1}. {a}</div><div className="event-copy">{b}</div></div></div>)}</div>
+            <div className="agent"><div className="agent-state"><span className="dot"/><div><strong style={{fontSize:13}}>Recommendation ready</strong><div className="muted" style={{fontSize:12,marginTop:3}}>{diagnosis}</div></div></div>
+              <div className="approval"><h3>Approval required · Create diagnostic work order</h3><p>This action changes operational state. RepairAtlas keeps consequential writes behind a human approval boundary.</p><div className="actions"><button className="btn primary" onClick={approveAction} disabled={busy||approved}>{approved?'Approved':'Approve action'}</button><button className="btn" onClick={runDiagnosis} disabled={busy}>Review evidence</button></div></div>
+              {approved&&<div className="approval" style={{marginTop:10,borderColor:'rgba(116,215,176,.25)',background:'rgba(116,215,176,.05)'}}><h3>Diagnostic work order created</h3><p>Record the technician outcome to turn this experience into durable memory.</p><div className="actions"><button className="btn primary" onClick={recordOutcome} disabled={busy}>{outcome?'Outcome recorded':'Record successful repair'}</button></div></div>}
             </div>
           </div>
           <aside className="card" id="memory">
@@ -56,7 +91,7 @@ export default function Home(){
             <div className="footer-note">CockroachDB stores the operational record and vector memory together. No second vector database is required.</div>
           </aside>
         </section>
-        <section className="card" style={{marginTop:18,padding:18}}><div className="eyebrow">Why this is different</div><div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:14,marginTop:12}}><div><strong>Remember outcomes</strong><p className="muted" style={{fontSize:12,lineHeight:1.55}}>The agent learns from successful and failed interventions, not just conversation history.</p></div><div><strong>Act safely</strong><p className="muted" style={{fontSize:12,lineHeight:1.55}}>Reads can be automated; consequential writes stay behind explicit approval.</p></div><div><strong>Keep memory close to truth</strong><p className="muted" style={{fontSize:12,lineHeight:1.55}}>Transactional state and semantic experiences live in the same CockroachDB system of record.</p></div></div></section>
+        <section className="card feature-panel"><div className="eyebrow">Why this is different</div><div className="feature-grid"><div><strong>Remember outcomes</strong><p className="muted">The agent learns from successful and failed interventions, not just conversation history.</p></div><div><strong>Act safely</strong><p className="muted">Reads can be automated; consequential writes stay behind explicit approval.</p></div><div><strong>Keep memory close to truth</strong><p className="muted">Transactional state and semantic experiences live in the same CockroachDB system of record.</p></div></div></section>
       </main>
     </div>
     <nav className="mobile-nav" aria-label="Mobile navigation">{['overview','work orders','memory','assets'].map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)}>{x}</button>)}</nav>
