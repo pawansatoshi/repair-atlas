@@ -48,7 +48,7 @@ The same CockroachDB system of record holds transactional state, repair events, 
 
 The project deliberately uses two CockroachDB capabilities required by the challenge: the Managed MCP Server and Distributed Vector Indexing. The application also uses CockroachDB as the transactional source of truth for work orders, repair events, agent actions, audit events, and memories.
 
-Amazon Titan Text Embeddings V2 produces 1,024-dimensional vectors, matching `VECTOR(1024)` in the schema. Similarity computation and retrieval remain in CockroachDB. citeturn1search3turn3search1
+Amazon Titan Text Embeddings V2 produces 1,024-dimensional vectors, matching `VECTOR(1024)` in the schema. Similarity computation and retrieval remain in CockroachDB.
 
 ## Golden scenario
 
@@ -102,9 +102,9 @@ The MCP configuration example is in `.mcp.json.example`. Use the exact authentic
 
 The hackathon requires the project to be deployed on AWS and to use at least one AWS service. The repository contains an AWS Amplify Hosting build specification for the Next.js application and an Amazon Bedrock AgentCore runtime implementation.
 
-AWS Amplify currently documents Next.js SSR deployment through its managed compute provider; this repository pins Next.js to the supported 15.x line for the AWS deployment path. citeturn1search1turn1search8
+AWS Amplify currently documents Next.js SSR deployment through its managed compute provider; this repository pins Next.js to the supported 15.x line for the AWS deployment path.
 
-For the AWS deployment, connect this GitHub repository to Amplify Hosting, configure the server-side environment variables/secrets, deploy the branch, then deploy and verify the AgentCore runtime. AWS documents Git-connected Next.js deployment and environment-variable configuration in Amplify. citeturn1search4turn1search6
+For the AWS deployment, connect this GitHub repository to Amplify Hosting, configure the server-side environment variables/secrets, deploy the branch, then deploy and verify the AgentCore runtime. AWS documents Git-connected Next.js deployment and environment-variable configuration in Amplify.
 
 Required runtime configuration includes:
 
@@ -122,7 +122,7 @@ Do not place secrets in source control. Use the AWS deployment console/secret me
 
 ## AgentCore
 
-The bounded agent is in `agentcore/repair_agent.py`. It embeds the incident with Bedrock, retrieves asset-scoped vector memory from CockroachDB, and asks Bedrock for a bounded recommendation. The current AWS AgentCore CLI workflow is documented in `agentcore/README.md`. AWS documents `agentcore create`, `agentcore dev`, `agentcore deploy`, `agentcore status`, and `agentcore invoke` as the current workflow. citeturn4search0turn4search6
+The bounded agent is in `agentcore/repair_agent.py`. It embeds the incident with Bedrock, retrieves asset-scoped vector memory from CockroachDB, and asks Bedrock for a bounded recommendation. The current AWS AgentCore CLI workflow is documented in `agentcore/README.md`.
 
 ## API surface
 
@@ -163,13 +163,13 @@ The UI is designed for mobile, tablet, laptop and desktop without browser deskto
 
 ## Demo discipline
 
-The final hackathon demo must show **real persistence and the real memory loop**. Hard-coded results are only fallback/demo evidence and are explicitly labeled. The submission video must show the project functioning and show CockroachDB memory at work, as required by the official rules. citeturn0search0
+The final hackathon demo must show **real persistence and the real memory loop**. Hard-coded results are only fallback/demo evidence and are explicitly labeled. The submission video must show the project functioning and show CockroachDB memory at work, as required by the official rules.
 
 ## Hackathon submission checklist
 
-The official submission requires a public repository, functional demo URL, English text description/testing instructions, a public video under three minutes, identification of CockroachDB and AWS tools used, and a project deployed on AWS. citeturn0search0
+The official submission requires a public repository, functional demo URL, English text description/testing instructions, a public video under three minutes, identification of CockroachDB and AWS tools used, and a project deployed on AWS.
 
-Submission deadline: **August 18, 2026 at 5:00 PM EDT**. citeturn0search1
+Submission deadline: **August 18, 2026 at 5:00 PM EDT**.
 
 ## Status
 
