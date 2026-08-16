@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { embed } from '@/lib/bedrock';
-import { query, withTransaction } from '@/lib/db';
+import { withTransaction } from '@/lib/db';
 
 const inputSchema = z.object({
   assetId: z.string().trim().min(1).max(100),
