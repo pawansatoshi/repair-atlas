@@ -1,5 +1,7 @@
 # RepairAtlas: Turning Repair History into Agentic Institutional Memory
 
+> **Implementation update — 2026-08-16:** The first concrete memory infrastructure milestone is now verified: an HTTP API invokes `repair-atlas-bedrock`, Amazon Titan Text Embeddings V2 generates a 1,024-dimensional vector, the vector is persisted in CockroachDB, and CockroachDB vector-distance retrieval returns the repair memory. Input validation and safe missing-memory handling are also verified. The full agentic loop described below remains the target and is not yet marked complete.
+
 ## The problem with operational memory
 
 Field-service organizations accumulate knowledge every time a technician diagnoses and repairs equipment. Yet much of that knowledge remains trapped in individual experience, free-form notes, old work orders, and disconnected documents.
@@ -30,6 +32,30 @@ A repair experience can contain:
 - semantic embedding
 
 This makes memory operational rather than decorative.
+
+## What is already proven
+
+The current backend milestone has been exercised against the deployed AWS path:
+
+```text
+HTTP client
+   ↓
+API Gateway POST /embed
+   ↓
+Lambda repair-atlas-bedrock
+   ↓
+Titan Text Embeddings V2
+   ↓
+VECTOR(1024)
+   ↓
+CockroachDB repair_memories
+   ↓
+vector-distance retrieval
+```
+
+The tested repair memory was persisted with a non-null embedding and a stored dimension of `1024`. A semantic/vector query returned the expected `Hydraulic Pump Overheating Inspection` memory. Malformed UUIDs and missing required fields return HTTP 400, while a syntactically valid but nonexistent memory returns HTTP 404.
+
+This proves the persistence building block. It does **not** by itself prove the full agent, MCP, UI, approval, work-order, outcome-learning, security, or production-release gates.
 
 ## Why CockroachDB is central
 
@@ -120,12 +146,13 @@ A completed repair becomes a new memory. The next incident can therefore benefit
 
 AWS is not included as a decorative deployment label.
 
-Amazon Bedrock provides model reasoning. Amazon Bedrock AgentCore Runtime provides the execution environment for the agent, including session isolation and agent-oriented observability. Amazon S3 stores service documentation and repair artifacts.
+Amazon Bedrock provides model reasoning and embeddings. The currently verified deployment uses AWS Lambda behind API Gateway for the embedding persistence path. The target architecture adds Amazon Bedrock AgentCore Runtime for bounded agent execution and Amazon S3 for service documentation and repair artifacts where required.
 
-The resulting division of responsibility is clear:
+The intended division of responsibility is clear:
 
 ```text
 AWS
+├── application hosting
 ├── reasoning
 ├── agent execution
 └── documents
@@ -168,6 +195,8 @@ The agent retrieves the newly reinforced experience and recommends the previousl
 The audience sees the central proposition without needing a long explanation:
 
 > **The system learned from the repair.**
+
+This golden demonstration is still a release milestone rather than a completed claim. The current verified work establishes the vector-memory foundation needed to build it.
 
 ## Why this is not another chatbot
 
