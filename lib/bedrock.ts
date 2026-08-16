@@ -1,12 +1,14 @@
 import { BedrockRuntimeClient, ConverseCommand, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { getRuntimeEnv } from './env';
 
-const region = process.env.AWS_REGION || 'us-east-1';
+const region = getRuntimeEnv('AWS_REGION') || 'us-east-1';
 const client = new BedrockRuntimeClient({ region });
 
 export async function embed(text: string): Promise<number[] | undefined> {
-  if (!process.env.BEDROCK_EMBED_MODEL_ID) return undefined;
+  const modelId = getRuntimeEnv('BEDROCK_EMBED_MODEL_ID');
+  if (!modelId) return undefined;
   const command = new InvokeModelCommand({
-    modelId: process.env.BEDROCK_EMBED_MODEL_ID,
+    modelId,
     contentType: 'application/json',
     accept: 'application/json',
     body: JSON.stringify({ inputText: text.slice(0, 8000) }),
@@ -17,9 +19,10 @@ export async function embed(text: string): Promise<number[] | undefined> {
 }
 
 export async function reason(prompt: string): Promise<string | undefined> {
-  if (!process.env.BEDROCK_MODEL_ID) return undefined;
+  const modelId = getRuntimeEnv('BEDROCK_MODEL_ID');
+  if (!modelId) return undefined;
   const command = new ConverseCommand({
-    modelId: process.env.BEDROCK_MODEL_ID,
+    modelId,
     messages: [{ role: 'user', content: [{ text: prompt.slice(0, 12000) }] }],
     inferenceConfig: { maxTokens: 700, temperature: 0.2 },
   });
