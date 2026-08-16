@@ -1,169 +1,156 @@
 # RepairAtlas
 
-> **Institutional memory for field operations.**
->
-> Every repair teaches the next one.
+> **Every repair teaches the next one.**
 
-RepairAtlas is an agentic field-service intelligence system designed to turn repair history into reusable operational memory. The agent retrieves previous failures, diagnoses, successful and failed interventions, reasons over the current asset state, performs controlled workflow actions, and converts completed repairs into new semantic memory.
+RepairAtlas is an agentic field-operations console that turns completed repairs into durable institutional memory. It retrieves prior experiences, distinguishes successful from failed interventions, proposes a bounded next step, keeps consequential writes behind human approval, and persists the outcome so the next incident can benefit from it.
 
 Built for the **CockroachDB × AWS Hackathon — Build with Agentic Memory**.
 
-## The core idea
-
-Traditional field-service software records work orders. Traditional AI assistants answer questions. RepairAtlas closes the loop:
-
-**Observe → Retrieve → Reason → Act → Verify → Learn**
-
-A completed repair is not the end of the workflow. It becomes institutional knowledge that can improve the next repair.
-
-## Why this matters
-
-Field technicians often have to rediscover knowledge that already exists inside an organization:
-
-- what failed before
-- what was tried
-- which intervention failed
-- which intervention worked
-- which parts were used
-- what the technician observed
-- what the final outcome was
-
-RepairAtlas makes that experience durable, searchable, and actionable.
-
-## Hackathon technology alignment
-
-### CockroachDB
-
-CockroachDB is the operational system of record and the agent's persistent memory layer.
-
-We intentionally use two core CockroachDB capabilities:
-
-1. **Distributed Vector Indexing** — semantic retrieval of previous repair experiences.
-2. **CockroachDB Cloud Managed MCP Server** — governed agent interaction with CockroachDB through MCP.
-
-The design keeps transactional asset state, repair history, agent state, audit records, and semantic memory together rather than introducing a separate vector database.
-
-### AWS
-
-The planned AWS execution path uses:
-
-- **Amazon Bedrock** — foundation-model reasoning.
-- **Amazon Bedrock AgentCore Runtime** — secure, serverless agent execution and session isolation.
-- **Amazon S3** — service manuals, equipment documents, and repair artifacts.
-
-AgentCore Runtime is framework-agnostic and supports MCP communication, session isolation, authentication, observability, and consumption-based execution. See the official AWS documentation in [`docs/technology.md`](docs/technology.md).
-
-## Memory architecture
-
-RepairAtlas models memory as more than conversation history:
-
-| Memory layer | Purpose | Example |
-|---|---|---|
-| Operational | Current truth | asset status, work order state |
-| Episodic | What happened | failure, diagnosis, action, outcome |
-| Semantic | What is similar | vectorized repair experience |
-| Learned | What worked | successful/failed intervention pattern |
-| Audit | What the agent did | tool, action, approval, result |
-
-The key design principle is **experience memory**: a repair event becomes future decision context.
-
-## Golden demo
-
-The primary demonstration is intentionally simple and reproducible:
-
-1. `PRESS-204` reports overheating during extended operation.
-2. The agent loads the current asset state.
-3. CockroachDB vector memory retrieves semantically similar historical repairs.
-4. The agent compares successful and unsuccessful interventions.
-5. It recommends inspecting airflow before replacing the motor.
-6. A controlled action creates a diagnostic work order.
-7. A technician records the successful repair.
-8. RepairAtlas converts that outcome into new semantic memory.
-9. A later incident is phrased differently.
-10. The agent retrieves the earlier experience and uses it again.
-
-The judge should be able to see the complete memory lifecycle in one continuous workflow.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    U[Field Technician] --> UI[RepairAtlas Web Console]
-    UI --> R[Amazon Bedrock AgentCore Runtime]
-    R --> B[Amazon Bedrock]
-    R --> S[Amazon S3\nManuals & Repair Artifacts]
-    R --> M[Managed MCP Server]
-    M --> C[(CockroachDB)]
-    C --> T[Transactional State\nAssets • Work Orders • Events]
-    C --> V[Distributed Vector Index\nRepair Experience Memory]
-    C --> A[Agent Actions & Audit Events]
-    V --> R
-    T --> R
-    A --> UI
-```
-
-A larger architecture specification is maintained in [`docs/architecture.md`](docs/architecture.md).
-
-## Repository map
+## The closed loop
 
 ```text
-repair-atlas/
-├── README.md
-├── ROADMAP.md
-├── BLUEPRINT.md
-├── SECURITY.md
-├── LICENSE
-├── .gitignore
-├── .env.example
-├── docs/
-│   ├── architecture.md
-│   ├── article.md
-│   ├── demo-script.md
-│   ├── judging-strategy.md
-│   └── technology.md
-├── database/
-│   ├── README.md
-│   └── schema.md
-├── agent/
-│   └── README.md
-├── app/
-│   └── README.md
-├── infrastructure/
-│   └── README.md
-└── tests/
-    └── README.md
+Current failure
+      ↓
+Asset context
+      ↓
+CockroachDB semantic memory retrieval
+      ↓
+Outcome-aware agent reasoning
+      ↓
+Human approval for consequential action
+      ↓
+Work-order / repair action
+      ↓
+Technician outcome
+      ↓
+Durable repair memory
+      ↓
+Future incident
 ```
 
-The repository is intentionally being established as a **new hackathon project**. Implementation will be added only after the architecture and compliance gates are validated.
+This is intentionally **not** a generic chatbot or chat-history demo.
+
+## Hackathon architecture
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| Product UI | Next.js + React | Responsive operations console |
+| Agent reasoning | Amazon Bedrock | Diagnostic recommendation |
+| Agent runtime | Amazon Bedrock AgentCore Runtime | Isolated, observable production execution |
+| System of record | CockroachDB Cloud | Transactional operational state + memory |
+| Semantic memory | CockroachDB Vector Indexing | Similarity retrieval without a second vector DB |
+| Agent/database interface | CockroachDB Managed MCP Server | Governed AI access to CockroachDB |
+| Documents | Amazon S3 | Manuals and maintenance artifacts |
+
+CockroachDB's current vector indexing supports similarity search alongside transactional data, while its managed MCP server provides hosted, RBAC-controlled agent access with read-only-by-default behavior and explicit write consent.
+
+Amazon Bedrock AgentCore Runtime is the intended production execution path for the agent layer, providing session isolation, observability and MCP support.
+
+## Golden scenario
+
+**Asset:** `PRESS-204`  
+**Symptom:** overheating after extended operation.
+
+The agent retrieves three relevant experiences:
+
+1. A successful airflow/filter intervention.
+2. A failed fan replacement.
+3. Another successful intake/filter intervention.
+
+It recommends checking airflow before replacing the motor, explains the evidence, and requires approval before creating a diagnostic work order. After the technician records the outcome, that experience is written back as durable memory.
+
+## Run locally
+
+Requirements:
+
+- Node.js 20+
+- npm
+- Optional: CockroachDB Cloud
+- Optional: AWS Bedrock access
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+Without cloud credentials the UI runs in **bounded demo mode**. It does not pretend that live database or Bedrock calls occurred. Configure the environment variables to activate the real integrations.
+
+## CockroachDB setup
+
+Run `database/schema.sql` against a dedicated application database using a least-privilege SQL role.
+
+Required production path:
+
+- CockroachDB transactional state
+- CockroachDB vector index on `repair_memories.embedding`
+- CockroachDB Managed MCP Server at `https://cockroachlabs.cloud/mcp`
+- scoped authentication/RBAC
+- explicit consent for writes
+
+The example MCP configuration is in `.mcp.json.example`. Use the exact authentication snippet generated by CockroachDB Cloud Console and never commit a credential.
+
+## AWS setup
+
+Set:
+
+```text
+AWS_REGION=
+BEDROCK_MODEL_ID=
+BEDROCK_EMBED_MODEL_ID=
+```
+
+The web API uses Bedrock for embeddings and reasoning when configured. The AgentCore implementation is under `agentcore/` and its deployment workflow is documented in `agentcore/README.md`.
+
+Keep IAM permissions narrowly scoped to the required Bedrock, database and storage operations.
+
+## API surface
+
+- `GET /api/health` — production health/dependency status.
+- `POST /api/memories` — scoped semantic retrieval.
+- `POST /api/diagnose` — bounded diagnostic reasoning.
+- `POST /api/work-orders` — approval-gated work-order creation.
+- `POST /api/outcomes` — durable repair outcome/memory persistence.
+
+All APIs validate input server-side and return safe error messages.
+
+## Product quality standard
+
+This repository follows:
+
+- `PROJECT_ZERO_BUG_DELIVERY_PROTOCOL.md`
+- `QA_RELEASE_GATE.md`
+- `templates/WEBSITE_PRODUCTION_BUILD_PROMPT.md`
+- `templates/DESIGN_SYSTEM_TEMPLATE.md`
+- `templates/UX_SPEC_TEMPLATE.md`
+- `templates/I18N_SPEC_TEMPLATE.md`
+- `templates/SECURITY_SPEC_TEMPLATE.md`
+- `templates/PERFORMANCE_SPEC_TEMPLATE.md`
+
+The UI is designed for mobile, tablet, laptop and desktop without requiring browser desktop mode. It uses semantic HTML, visible focus states, responsive layout, reduced-motion support, intentional loading/error/empty states and a touch-friendly mobile navigation.
 
 ## Security principles
 
-RepairAtlas will follow least privilege by design:
+- No secrets in source control.
+- No client-trusted authorization.
+- Consequential agent writes require approval.
+- No unrestricted administrative SQL.
+- Repair/audit history is append-oriented.
+- External model output is treated as untrusted input.
+- Errors do not expose stack traces or credentials.
 
-- no secrets committed to Git
-- scoped CockroachDB credentials
-- constrained agent tools
-- approval gates for consequential writes
-- immutable audit records
-- input validation
-- no unrestricted SQL from the model
-- no credentials in application logs
-- explicit failure handling
+## Demo discipline
 
-See [`SECURITY.md`](SECURITY.md).
+The hackathon demo must show real persistence and a real memory loop. Hard-coded results do not count as evidence. When cloud integrations are unavailable, the product labels itself as demo mode rather than fabricating connectivity.
 
-## Development status
+## Status
 
-**Phase: Architecture and foundation.**
-
-The current repository contains the product blueprint, architecture, judging strategy, demo plan, security model, and implementation roadmap. Functional code will be added incrementally after the architecture sanity check.
-
-## Competition
-
-**CockroachDB × AWS Hackathon — Build with Agentic Memory**
-
-The project is being developed as a new submission during the hackathon period. All reused libraries, frameworks, templates, or external components will be documented appropriately.
+**Implementation:** MVP application foundation complete.  
+**Live cloud integrations:** require project credentials and deployment configuration.  
+**Final release:** not yet claimed until the full QA/release protocol has been executed against the deployed environment.
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+MIT
