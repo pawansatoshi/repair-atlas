@@ -6,6 +6,11 @@ frontend:
         - npm install
     build:
       commands:
+        # Amplify app environment variables are available to the build, but
+        # Next.js server-side runtime does not receive them automatically.
+        # Bridge only the server runtime configuration needed by RepairAtlas.
+        # Do not add client-side or NEXT_PUBLIC_ secrets here.
+        - env | grep -E '^(DATABASE_URL|DATABASE_SSL|DB_POOL_MAX|DEMO_ORG_ID|BEDROCK_MODEL_ID|BEDROCK_EMBED_MODEL_ID|COCKROACH_MCP_URL)=' >> .env.production || true
         - npm run typecheck
         - npm run lint
         - npm run test
