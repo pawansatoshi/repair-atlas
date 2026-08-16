@@ -1,15 +1,17 @@
 import { Pool, type PoolClient } from 'pg';
+import { getRuntimeEnv } from './env';
 
 let pool: Pool | undefined;
 
 export function getPool() {
-  if (!process.env.DATABASE_URL) return undefined;
+  const databaseUrl = getRuntimeEnv('DATABASE_URL');
+  if (!databaseUrl) return undefined;
   pool ??= new Pool({
-    connectionString: process.env.DATABASE_URL,
-    max: Number(process.env.DB_POOL_MAX || 5),
+    connectionString: databaseUrl,
+    max: Number(getRuntimeEnv('DB_POOL_MAX') || 5),
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 5_000,
-    ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: true },
+    ssl: getRuntimeEnv('DATABASE_SSL') === 'false' ? false : { rejectUnauthorized: true },
   });
   return pool;
 }
