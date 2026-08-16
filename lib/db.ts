@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 
 let pool: Pool | undefined;
 
@@ -18,4 +18,21 @@ export async function query<T extends Record<string, unknown>>(text: string, val
   const db = getPool();
   if (!db) throw new Error('DATABASE_NOT_CONFIGURED');
   return db.query<T>(text, values);
+}
+
+export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const db = getPool();
+  if (!db) throw new Error('DATABASE_NOT_CONFIGURED');
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
