@@ -2,16 +2,16 @@
 
 import { useMemo, useState } from 'react';
 
-type Memory = { id:string; title:string; copy:string; outcome:string; score:number };
+type Memory = { id:string; title:string; summary?:string; copy?:string; outcome:string; relevance?:number; score?:number; distance?:number };
 
-const memories: Memory[] = [
-  {id:'mem-01',title:'Airflow restriction after extended runtime',copy:'Similar PRESS-204 incident. Intake obstruction was cleared and filter replaced; motor replacement was unnecessary.',outcome:'resolved',score:96},
-  {id:'mem-02',title:'Fan replacement did not resolve overheating',copy:'A prior attempt replaced the fan assembly without resolving the thermal symptom.',outcome:'failed',score:88},
-  {id:'mem-03',title:'Dust-loaded intake filter',copy:'Cleaning the intake path and replacing a saturated filter restored stable operating temperature.',outcome:'resolved',score:81},
+const demoMemories: Memory[] = [
+  {id:'mem-01',title:'Airflow restriction after extended runtime',summary:'Similar PRESS-204 incident. Intake obstruction was cleared and filter replaced; motor replacement was unnecessary.',outcome:'resolved',relevance:0.96},
+  {id:'mem-02',title:'Fan replacement did not resolve overheating',summary:'A prior attempt replaced the fan assembly without resolving the thermal symptom.',outcome:'failed',relevance:0.88},
+  {id:'mem-03',title:'Dust-loaded intake filter',summary:'Cleaning the intake path and replacing a saturated filter restored stable operating temperature.',outcome:'resolved',relevance:0.81},
 ];
 
 const logs = [
-  ['retrieve','Retrieved 3 repair experiences scoped to PRESS-204'],
+  ['retrieve','Retrieved relevant repair experiences scoped to PRESS-204'],
   ['compare','Compared successful and failed interventions'],
   ['reason','Recommendation favors airflow inspection before motor replacement'],
   ['policy','Write action requires technician approval'],
@@ -21,19 +21,26 @@ export default function Home(){
   const [query,setQuery]=useState('PRESS-204 overheating after extended operation');
   const [approved,setApproved]=useState(false);
   const [outcome,setOutcome]=useState(false);
+  const [workOrderId,setWorkOrderId]=useState('');
   const [tab,setTab]=useState('overview');
   const [diagnosis,setDiagnosis]=useState('Inspect intake airflow and filter condition before replacing the motor.');
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState('');
-  const filtered=useMemo(()=>memories.filter(m=>`${m.title} ${m.copy}`.toLowerCase().includes(query.toLowerCase().split(' ')[0]||'x')||query.includes('PRESS-204')),[query]);
+  const [memories,setMemories]=useState<Memory[]>(demoMemories);
+  const [retrievalMode,setRetrievalMode]=useState<'demo'|'cockroachdb-recent'|'cockroachdb-vector'>('demo');
+
+  const filtered=useMemo(()=>memories.filter(m=>`${m.title} ${m.summary||m.copy||''}`.toLowerCase().includes(query.toLowerCase().split(' ')[0]||'x')||query.toLowerCase().includes('press-204')),[query,memories]);
 
   async function runDiagnosis(){
-    setBusy(true); setMessage(''); setApproved(false); setOutcome(false);
+    setBusy(true); setMessage(''); setApproved(false); setOutcome(false); setWorkOrderId('');
     try{
       const response=await fetch('/api/diagnose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assetId:'PRESS-204',symptom:query})});
       const data=await response.json();
       if(!response.ok) throw new Error(data.error||'Diagnosis unavailable');
-      setDiagnosis(data.recommendation||diagnosis); setMessage(data.mode==='bedrock'?'Live Bedrock reasoning completed.':'Bounded demo reasoning active.');
+      setDiagnosis(data.recommendation||diagnosis);
+      setMemories(Array.isArray(data.memories)?data.memories:[]);
+      setRetrievalMode(data.retrievalMode||'demo');
+      setMessage(data.mode==='bedrock' ? 'Bedrock reasoning completed.' : data.retrievalMode==='cockroachdb-vector' ? 'CockroachDB vector memory retrieved.' : data.retrievalMode==='cockroachdb-recent' ? 'CockroachDB memory retrieved without semantic ranking.' : 'Bounded demo reasoning active.');
     }catch(error){setMessage(error instanceof Error?error.message:'Diagnosis unavailable');}
     finally{setBusy(false);}
   }
@@ -44,7 +51,7 @@ export default function Home(){
       const response=await fetch('/api/work-orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approved:true,assetId:'PRESS-204'})});
       const data=await response.json();
       if(!response.ok) throw new Error(data.error||'Unable to create work order');
-      setApproved(true); setMessage(`${data.mode==='cockroachdb'?'CockroachDB':'Demo'} work order ${data.id} staged.`);
+      setApproved(true); setWorkOrderId(String(data.id||'')); setMessage(`${data.mode==='cockroachdb'?'CockroachDB':'Demo'} work order ${data.id} staged${data.reused?' (existing open order reused)':''}.`);
     }catch(error){setMessage(error instanceof Error?error.message:'Unable to create work order');}
     finally{setBusy(false);}
   }
@@ -55,25 +62,25 @@ export default function Home(){
       const response=await fetch('/api/outcomes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assetId:'PRESS-204',outcome:'resolved',summary:'Intake obstruction confirmed. Airflow path cleared and filter replaced; overheating resolved without motor replacement.'})});
       const data=await response.json();
       if(!response.ok) throw new Error(data.error||'Unable to persist outcome');
-      setOutcome(true); setMessage(`${data.mode==='cockroachdb'?'CockroachDB':'Demo'} repair memory persisted.`);
-    }catch(error){setMessage(error instanceof Error?error.message:'Unable to persist outcome');}
+      setOutcome(true); setMessage(`${data.mode==='cockroachdb'?'CockroachDB':'Demo'} repair memory persisted${data.eventId?' and linked to the repair event':''}.`);
+    }catch(error){setMessage(error instanceof Error?error.message:'Unable to persist repair outcome');}
     finally{setBusy(false);}
   }
 
   return <div className="app">
-    <header className="topbar"><div className="brand"><div className="mark">R</div><span>RepairAtlas</span></div><div className="status"><span className="dot"/>Memory system ready <span className="pill">CockroachDB</span></div></header>
+    <header className="topbar"><div className="brand"><div className="mark">R</div><span>RepairAtlas</span></div><div className="status"><span className="dot"/>Memory system ready <span className="pill">{retrievalMode==='cockroachdb-vector'?'CockroachDB vector':'Bounded demo'}</span></div></header>
     <div className="shell">
       <aside className="sidebar" aria-label="Primary navigation">
         <div className="nav-title">Operations</div>
         {['overview','work orders','memory','assets'].map(x=><button key={x} className={`nav-btn ${tab===x?'active':''}`} onClick={()=>setTab(x)} aria-current={tab===x?'page':undefined}><span aria-hidden="true">{x==='overview'?'◈':x==='work orders'?'□':x==='memory'?'◌':'◇'}</span><span>{x}</span></button>)}
-        <div className="nav-title">System</div><button className="nav-btn" onClick={()=>setTab('health')}><span aria-hidden="true">●</span><span>Health</span></button>
+        <div className="nav-title">System</div><button className={`nav-btn ${tab==='health'?'active':''}`} onClick={()=>setTab('health')}><span aria-hidden="true">●</span><span>Health</span></button>
       </aside>
       <main className="main">
         <section className="hero"><div><div className="eyebrow">Agentic field intelligence</div><h1>Every repair teaches the next one.</h1><p>RepairAtlas turns field experience into durable operational memory. The agent retrieves what worked before, explains why, and proposes the next safe action.</p></div><div className="hero-actions"><button className="btn" onClick={()=>document.getElementById('memory')?.scrollIntoView({behavior:'smooth'})}>View memory</button><button className="btn primary" onClick={runDiagnosis} disabled={busy}>{busy?'Reasoning…':'Run diagnosis'}</button></div></section>
-        {message&&<div role="status" className="pill" style={{marginBottom:14,padding:'9px 12px'}}>{message}</div>}
+        {message&&<div role="status" aria-live="polite" className="pill" style={{marginBottom:14,padding:'9px 12px'}}>{message}</div>}
         <section className="grid">
           <div className="card">
-            <div className="card-head"><div><div className="card-title">Active incident</div><div className="muted" style={{fontSize:12,marginTop:4}}>Work order WO-2048 · Open</div></div><span className="pill good">Live workflow</span></div>
+            <div className="card-head"><div><div className="card-title">Active incident</div><div className="muted" style={{fontSize:12,marginTop:4}}>Work order {workOrderId||'WO-2048'} · {approved?'Open':'Awaiting approval'}</div></div><span className="pill good">Human-in-the-loop</span></div>
             <div className="asset"><div className="asset-top"><div><div className="eyebrow">Asset</div><h2>PRESS-204</h2><div className="muted" style={{fontSize:13,marginTop:5}}>Hydraulic press · Site 07 · Line B</div></div><span className="pill">Overheating</span></div>
               <div className="metrics"><div className="metric"><span className="muted" style={{fontSize:11}}>Current temp</span><strong>92°C</strong></div><div className="metric"><span className="muted" style={{fontSize:11}}>Runtime</span><strong>6h 18m</strong></div><div className="metric"><span className="muted" style={{fontSize:11}}>Memory hits</span><strong>{filtered.length}</strong></div></div>
             </div>
@@ -81,19 +88,19 @@ export default function Home(){
             <div className="timeline">{logs.map(([a,b],i)=><div className="timeline-item" key={a}><div className="rail"><div className="node"/></div><div><div className="event-title">{i+1}. {a}</div><div className="event-copy">{b}</div></div></div>)}</div>
             <div className="agent"><div className="agent-state"><span className="dot"/><div><strong style={{fontSize:13}}>Recommendation ready</strong><div className="muted" style={{fontSize:12,marginTop:3}}>{diagnosis}</div></div></div>
               <div className="approval"><h3>Approval required · Create diagnostic work order</h3><p>This action changes operational state. RepairAtlas keeps consequential writes behind a human approval boundary.</p><div className="actions"><button className="btn primary" onClick={approveAction} disabled={busy||approved}>{approved?'Approved':'Approve action'}</button><button className="btn" onClick={runDiagnosis} disabled={busy}>Review evidence</button></div></div>
-              {approved&&<div className="approval" style={{marginTop:10,borderColor:'rgba(116,215,176,.25)',background:'rgba(116,215,176,.05)'}}><h3>Diagnostic work order created</h3><p>Record the technician outcome to turn this experience into durable memory.</p><div className="actions"><button className="btn primary" onClick={recordOutcome} disabled={busy}>{outcome?'Outcome recorded':'Record successful repair'}</button></div></div>}
+              {approved&&<div className="approval" style={{marginTop:10,borderColor:'rgba(116,215,176,.25)',background:'rgba(116,215,176,.05)'}}><h3>Diagnostic work order created</h3><p>{workOrderId?'Work order '+workOrderId+' is open. ':''}Record the technician outcome to turn this experience into durable memory.</p><div className="actions"><button className="btn primary" onClick={recordOutcome} disabled={busy||outcome}>{outcome?'Outcome recorded':'Record successful repair'}</button></div></div>}
             </div>
           </div>
           <aside className="card" id="memory">
-            <div className="card-head"><div><div className="card-title">Repair memory</div><div className="muted" style={{fontSize:12,marginTop:4}}>Semantic + transactional retrieval</div></div><span className="pill good">Vector index</span></div>
-            <div style={{padding:14}}><label htmlFor="memory-search" className="muted" style={{fontSize:11}}>Describe the current symptom</label><input id="memory-search" className="search" value={query} onChange={e=>setQuery(e.target.value)} aria-describedby="search-help"/><div id="search-help" className="muted" style={{fontSize:11}}>Retrieval is scoped to asset context before similarity ranking.</div></div>
-            <div className="memory-list">{filtered.length?filtered.map(m=><div className="memory" key={m.id}><strong>{m.title}</strong><p>{m.copy}</p><div className="score">{m.outcome==='resolved'?'✓ Successful outcome':'× Failed intervention'} · {m.score}% relevance</div></div>):<div className="empty">No matching memories. Try a broader symptom.</div>}</div>
+            <div className="card-head"><div><div className="card-title">Repair memory</div><div className="muted" style={{fontSize:12,marginTop:4}}>{retrievalMode==='cockroachdb-vector'?'Semantic + transactional retrieval':'Evidence retrieval'}</div></div><span className={`pill ${retrievalMode==='cockroachdb-vector'?'good':''}`}>{retrievalMode==='cockroachdb-vector'?'Vector index':retrievalMode==='cockroachdb-recent'?'DB recent':'Demo memory'}</span></div>
+            <div style={{padding:14}}><label htmlFor="memory-search" className="muted" style={{fontSize:11}}>Describe the current symptom</label><input id="memory-search" className="search" value={query} onChange={e=>setQuery(e.target.value)} aria-describedby="search-help"/><div id="search-help" className="muted" style={{fontSize:11}}>Run diagnosis to query the configured memory layer. Local filtering only narrows the displayed evidence.</div></div>
+            <div className="memory-list">{filtered.length?filtered.map(m=><div className="memory" key={m.id}><strong>{m.title}</strong><p>{m.summary||m.copy}</p><div className="score">{m.outcome==='resolved'?'✓ Successful outcome':'× Failed intervention'}{typeof m.relevance==='number'?` · ${Math.round(m.relevance*100)}% relevance`:''}</div></div>):<div className="empty">No matching memories. Try a broader symptom.</div>}</div>
             <div className="footer-note">CockroachDB stores the operational record and vector memory together. No second vector database is required.</div>
           </aside>
         </section>
         <section className="card feature-panel"><div className="eyebrow">Why this is different</div><div className="feature-grid"><div><strong>Remember outcomes</strong><p className="muted">The agent learns from successful and failed interventions, not just conversation history.</p></div><div><strong>Act safely</strong><p className="muted">Reads can be automated; consequential writes stay behind explicit approval.</p></div><div><strong>Keep memory close to truth</strong><p className="muted">Transactional state and semantic experiences live in the same CockroachDB system of record.</p></div></div></section>
       </main>
     </div>
-    <nav className="mobile-nav" aria-label="Mobile navigation">{['overview','work orders','memory','assets'].map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)}>{x}</button>)}</nav>
+    <nav className="mobile-nav" aria-label="Mobile navigation">{['overview','work orders','memory','assets'].map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)} aria-current={tab===x?'page':undefined}>{x}</button>)}</nav>
   </div>
 }
