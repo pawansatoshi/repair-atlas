@@ -216,9 +216,12 @@ Verified:
 - API Gateway HTTP API
 - API Gateway → Lambda integration
 - Successful remote API invocation
+- AWS Amplify production build
+- AWS Amplify deployment completion
 
 Still required:
 
+- Public Amplify branch-domain accessibility/DNS verification
 - AgentCore Runtime configuration/verification if retained in the architecture
 - Runtime authentication/authorization
 - Least-privilege IAM review
@@ -226,7 +229,7 @@ Still required:
 - Full agent deployment
 - Production remote invocation of the complete agent loop
 
-**Important architecture note:** the currently verified implementation path is **API Gateway → Lambda → Bedrock → CockroachDB**. The repository's target architecture names AgentCore Runtime, but AgentCore has not been marked verified by this report.
+**Important architecture note:** the currently verified backend path is **API Gateway → Lambda → Bedrock → CockroachDB**. The repository's target architecture names AgentCore Runtime, but AgentCore has not been marked verified by this report. AWS Amplify is now also verified as a successful build/deployment path, but the displayed public branch domain returned `DNS_PROBE_POSSIBLE` during mobile-browser verification.
 
 ### Phase 6 — Product UI
 
@@ -330,6 +333,7 @@ For handoff purposes:
 - **Backend embedding/persistence slice:** COMPLETE for the tested path.
 - **Database/vector foundation:** SUBSTANTIALLY STARTED and partially verified.
 - **AWS API integration:** SUBSTANTIALLY STARTED and partially verified.
+- **AWS Amplify build/deployment:** VERIFIED; public-domain accessibility remains open.
 - **Full agentic memory loop:** NOT COMPLETE.
 - **MCP integration:** NOT VERIFIED.
 - **UI/product layer:** NOT COMPLETE/NOT VERIFIED in this handoff.
@@ -337,36 +341,38 @@ For handoff purposes:
 - **Golden demo:** NOT COMPLETE.
 - **Submission package:** NOT COMPLETE.
 
-The critical remaining work is therefore not another embedding test. It is completing and proving the end-to-end product loop.
+The critical remaining work is therefore not another embedding test. It is resolving public deployment access and then completing/proving the end-to-end product loop.
 
 ## 6. Next-agent execution order
 
 Follow this order and do not redo completed embedding tests unless a regression requires it:
 
 ```text
-1. Audit actual repository/application code
+1. Resolve/verify Amplify branch-domain DNS/accessibility
         ↓
-2. Reconcile target architecture vs actual AWS path
+2. Audit actual repository/application code
         ↓
-3. Complete CockroachDB schema/migrations + retrieval layer
+3. Reconcile target architecture vs actual AWS path
         ↓
-4. Complete agent orchestration and evidence-based recommendation
+4. Complete CockroachDB schema/migrations + retrieval layer
         ↓
-5. Complete MCP integration + permission tests
+5. Complete agent orchestration and evidence-based recommendation
         ↓
-6. Complete approval + work-order + outcome workflow
+6. Complete MCP integration + permission tests
         ↓
-7. Complete memory update and future-memory reuse
+7. Complete approval + work-order + outcome workflow
         ↓
-8. Build/audit operations UI
+8. Complete memory update and future-memory reuse
         ↓
-9. Run full QA_RELEASE_GATE.md
+9. Build/audit operations UI
         ↓
-10. Execute PRESS-204 golden demo twice
+10. Run full QA_RELEASE_GATE.md
         ↓
-11. Security/reliability/adversarial regression
+11. Execute PRESS-204 golden demo twice
         ↓
-12. Final screenshots/video/README/submission package
+12. Security/reliability/adversarial regression
+        ↓
+13. Final screenshots/video/README/submission package
 ```
 
 ## 7. Non-negotiable engineering rules
@@ -392,3 +398,37 @@ Follow this order and do not redo completed embedding tests unless a regression 
 - This file — dated implementation handoff and verified evidence snapshot.
 
 **Next agent rule:** read this file first, then `BLUEPRINT.md`, `ROADMAP.md`, and `QA_RELEASE_GATE.md` before changing architecture or repeating tests.
+
+## 9. Latest verification delta — 2026-08-16
+
+The following findings occurred after the earlier handoff snapshot and are now recorded in `docs/DEBUGGING_LOG_2026-08-16.md`:
+
+### Resolved / documented
+
+- Git author identity was missing in CloudShell; repository-local identity was configured and the commit succeeded.
+- GitHub HTTPS password authentication failed; a repository-scoped fine-grained PAT was used successfully. The token is not stored in the repository.
+- The remote branch was ahead of the local branch; `git pull --rebase origin main` reconciled history and the subsequent push succeeded.
+- Amplify initially rejected an AWS-prefixed environment variable with its reserved-prefix validation. The final deployment nevertheless completed successfully; effective runtime-variable behavior remains a verification item.
+- Amplify production build passed typecheck, lint, tests, and Next.js production build.
+
+### Current open blocker
+
+- Amplify reports the `main` deployment as **Deployed** and its deploy log says **Deployment complete**, but the displayed public branch domain returned `DNS_PROBE_POSSIBLE` from the tested mobile browser.
+- This is treated as a deployment-access/DNS verification issue, not a build failure.
+- **Do not switch to Vercel solely because of this finding.** Verify the Amplify branch/domain configuration first.
+
+### Current evidence summary
+
+```text
+Local quality gates       PASS
+CockroachDB/vector path   PASS
+Bedrock embedding path    PASS
+API Gateway/Lambda        PASS
+Amplify build             PASS
+Amplify deployment        PASS
+Public Amplify URL        OPEN / DNS verification
+AgentCore full loop       OPEN
+MCP end-to-end            OPEN
+Golden demo                OPEN
+Final release              NOT READY
+```
