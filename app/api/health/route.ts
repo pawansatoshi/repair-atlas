@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
+import { hasRuntimeEnv } from '@/lib/env';
 
 export async function GET() {
   const db = getPool();
@@ -29,14 +30,19 @@ export async function GET() {
   }
 
   const degraded = database === 'unavailable' || (database === 'connected' && !tablesReady);
+  const bedrock = hasRuntimeEnv('BEDROCK_MODEL_ID');
+  const embeddings = hasRuntimeEnv('BEDROCK_EMBED_MODEL_ID');
+
   return NextResponse.json({
     status: degraded ? 'degraded' : 'ok',
     database,
+    databaseConfigured: hasRuntimeEnv('DATABASE_URL'),
     tablesReady,
     vectorMemory,
-    bedrock: Boolean(process.env.AWS_REGION && process.env.BEDROCK_MODEL_ID),
-    embeddings: Boolean(process.env.AWS_REGION && process.env.BEDROCK_EMBED_MODEL_ID),
-    mcp: Boolean(process.env.COCKROACH_MCP_URL),
+    bedrock,
+    embeddings,
+    mcp: hasRuntimeEnv('COCKROACH_MCP_URL'),
+    runtimeConfigSource: process.env.secrets ? 'amplify-secrets-or-env' : 'environment',
     timestamp: new Date().toISOString(),
   }, { status: degraded ? 503 : 200, headers: { 'Cache-Control': 'no-store' } });
 }
