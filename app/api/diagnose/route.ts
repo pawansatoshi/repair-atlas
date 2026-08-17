@@ -13,6 +13,18 @@ const fallback = 'Inspect intake airflow and filter condition before replacing t
 
 type MemoryRow = { id: string; title: string; summary: string; outcome: string; distance?: number };
 
+async function recentMemories(organizationId: string, assetId: string): Promise<MemoryRow[]> {
+  const result = await query<MemoryRow>(
+    `SELECT id, title, summary, outcome
+     FROM repair_memories
+     WHERE organization_id = $1 AND asset_id = $2
+     ORDER BY created_at DESC
+     LIMIT 5`,
+    [organizationId, assetId],
+  );
+  return result.rows;
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!req.headers.get('content-type')?.toLowerCase().includes('application/json')) {
@@ -28,9 +40,6 @@ export async function POST(req: NextRequest) {
     let retrievalMode: 'cockroachdb-vector' | 'cockroachdb-recent' | 'demo' = 'demo';
     let embeddingAvailable = false;
 
-    // Embedding is an enhancement to retrieval, not a reason to take the entire
-    // diagnostic workflow down. If Bedrock embedding invocation is unavailable,
-    // continue with the same CockroachDB records using recent retrieval.
     let vector: number[] | undefined;
     try {
       vector = await embed(`${assetId} ${symptom}`);
@@ -40,34 +49,39 @@ export async function POST(req: NextRequest) {
     }
 
     if (vector && hasDatabase) {
-      const vectorLiteral = `[${vector.join(',')}]`;
-      const result = await query<MemoryRow>(
-        `SELECT id, title, summary, outcome, embedding <=> $1::VECTOR AS distance
-         FROM repair_memories
-         WHERE organization_id = $2 AND asset_id = $3 AND embedding IS NOT NULL
-         ORDER BY embedding <=> $1::VECTOR
-         LIMIT 5`,
-        [vectorLiteral, organizationId, assetId],
-      );
-      memories = result.rows;
-      retrievalMode = 'cockroachdb-vector';
-    } else if (hasDatabase) {
-      const result = await query<MemoryRow>(
-        `SELECT id, title, summary, outcome
-         FROM repair_memories
-         WHERE organization_id = $1 AND asset_id = $2
-         ORDER BY created_at DESC
-         LIMIT 5`,
-        [organizationId, assetId],
-      );
-      memories = result.rows;
-      retrievalMode = 'cockroachdb-recent';
-    } else {
+      try {
+        const vectorLiteral = `[${vector.join(',')}]`;
+        const result = await query<MemoryRow>(
+          `SELECT id, title, summary, outcome, embedding <=> $1::VECTOR AS distance
+           FROM repair_memories
+           WHERE organization_id = $2 AND asset_id = $3 AND embedding IS NOT NULL
+           ORDER BY embedding <=> $1::VECTOR
+           LIMIT 5`,
+          [vectorLiteral, organizationId, assetId],
+        );
+        memories = result.rows;
+        retrievalMode = 'cockroachdb-vector';
+      } catch (error) {
+        console.error('diagnosis vector retrieval failed', error instanceof Error ? error.message : 'unknown');
+      }
+    }
+
+    if (!memories.length && hasDatabase) {
+      try {
+        memories = await recentMemories(organizationId, assetId);
+        retrievalMode = 'cockroachdb-recent';
+      } catch (error) {
+        console.error('diagnosis recent retrieval failed', error instanceof Error ? error.message : 'unknown');
+      }
+    }
+
+    if (!memories.length && !hasDatabase) {
       memories = [
         { id: 'demo-01', title: 'Airflow restriction after extended runtime', summary: 'Intake obstruction was cleared and filter replaced; overheating resolved without motor replacement.', outcome: 'resolved' },
         { id: 'demo-02', title: 'Fan replacement did not resolve overheating', summary: 'A prior attempt replaced the fan assembly without resolving the thermal symptom.', outcome: 'failed' },
         { id: 'demo-03', title: 'Dust-loaded intake filter', summary: 'Cleaning the intake path and replacing a saturated filter restored stable operating temperature.', outcome: 'resolved' },
       ];
+      retrievalMode = 'demo';
     }
 
     const context = memories.length
@@ -75,8 +89,6 @@ export async function POST(req: NextRequest) {
       : 'No matching historical records were found. Do not invent historical evidence.';
     const prompt = `You are RepairAtlas, a field-repair diagnostic assistant. Asset: ${assetId}. Current symptom: ${symptom}. Historical evidence: ${context}. Provide a concise recommendation grounded only in the supplied evidence. Clearly distinguish successful and failed interventions. Never invent measurements, parts, causes, or certainty. Do not authorize destructive or consequential actions. Recommendation:`;
 
-    // Reasoning is also best-effort: a transient/model-access problem should not
-    // hide the grounded evidence and safe deterministic recommendation.
     let recommendation: string | undefined;
     let reasoningAvailable = false;
     try {
