@@ -87,15 +87,15 @@ The MCP configuration example is in `.mcp.json.example`. Use the exact authentic
 
 ## AWS deployment
 
-The repository contains AWS Amplify Hosting configuration for the Next.js application and an AgentCore runtime implementation.
+The repository contains AWS Amplify Hosting configuration for the Next.js application and the AgentCore runtime project under `app/RepairAtlas/`.
 
-For production deployment, connect the repository to Amplify Hosting and configure server-side environment variables/secrets through AWS. If AgentCore is retained in the deployment architecture, deploy and independently invoke the runtime before describing it as runtime-verified.
+For production deployment, connect the repository to Amplify Hosting and configure server-side environment variables/secrets through AWS. Deploy and independently invoke the AgentCore runtime before describing it as runtime-verified.
 
 Sensitive values must remain in the AWS deployment/secret mechanism and outside source control.
 
 ## AgentCore
 
-The bounded agent implementation is in `agentcore/repair_agent.py`. It embeds the incident with Bedrock, retrieves asset-scoped repair memory from CockroachDB, and requests a bounded recommendation from Bedrock.
+The AgentCore CLI project is defined by `app/RepairAtlas/pyproject.toml` and `app/RepairAtlas/main.py`, with `app/RepairAtlas/` as the configured CodeZip runtime location in `agentcore/agentcore.json`. The runtime embeds the incident with Bedrock, retrieves asset-scoped repair memory from CockroachDB, and requests a bounded recommendation from Bedrock.
 
 The current release evidence verifies the deployed web application's Bedrock/vector reasoning path. An independent deployed AgentCore runtime invocation remains a separate verification item.
 
@@ -108,14 +108,13 @@ The current release evidence verifies the deployed web application's Bedrock/vec
 - `POST /api/outcomes` — audited repair event and durable memory persistence.
 - `GET /api/mcp` — managed MCP configuration/reachability check when credentials are configured.
 
-Write APIs validate input server-side, enforce organization/asset boundaries, use safe error responses, and avoid exposing stack traces or credentials.
+Write APIs validate input server-side, enforce organization/asset scope, use safe error responses, and avoid exposing stack traces or credentials.
 
 ## Quality and security
 
 The repository maintains explicit engineering and release gates in:
 
 - `QA_RELEASE_GATE.md`
-- `PROJECT_ZERO_BUG_DELIVERY_PROTOCOL.md`
 - `RELEASE_READINESS.md`
 - `SECURITY.md`
 
@@ -124,9 +123,9 @@ The UI is designed for mobile, tablet, laptop, and desktop use. It includes visi
 Security principles include:
 
 - no secrets in source control
-- server-side organization and asset authorization
+- server-side organization and asset scoping
 - explicit approval for consequential agent writes
-- validation of external model output
+- validation of external model input/output boundaries
 - audited consequential actions
 - safe error handling without stack traces or credentials
 
