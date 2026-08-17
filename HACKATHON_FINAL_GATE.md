@@ -89,7 +89,7 @@ The actual observed JSON is preserved in the engineering handoff and conversatio
 
 The bounded agent is implemented in `agentcore/repair_agent.py` and the repository contains the current AgentCore CLI workflow.
 
-AWS documents the AgentCore CLI as the supported path for creating, deploying, checking status, and invoking AgentCore runtimes. citeturn995237search0
+The current AWS AgentCore CLI workflow supports creating, deploying, checking status, and invoking AgentCore runtimes.
 
 Remaining action:
 
