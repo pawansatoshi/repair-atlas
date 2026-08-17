@@ -20,11 +20,20 @@ export async function POST(req: NextRequest) {
 
     const { assetId, summary, outcome } = body.data;
     const organizationId = getRuntimeEnv('DEMO_ORG_ID') || 'demo-org';
-    if (!getRuntimeEnv('DATABASE_URL')) return NextResponse.json({ mode: 'demo', id: `mem-${Date.now()}`, status: 'persisted', outcome });
+    if (!getRuntimeEnv('DATABASE_URL')) {
+      return NextResponse.json({ mode: 'demo', id: `mem-${Date.now()}`, status: 'persisted', outcome, embeddingPending: false });
+    }
 
-    const vector = await embed(`${assetId} ${summary} ${outcome}`);
-    if (!vector) return NextResponse.json({ error: 'embedding service unavailable' }, { status: 503 });
-    if (vector.length !== 1024) return NextResponse.json({ error: 'embedding dimension mismatch' }, { status: 503 });
+    // Embeddings enrich the memory for future semantic retrieval, but they must
+    // not block the transactional repair record. A transient embedding failure
+    // now leaves embedding NULL and the diagnosis route backfills it later.
+    let vector: number[] | undefined;
+    try {
+      const candidate = await embed(`${assetId} ${summary} ${outcome}`);
+      if (candidate?.length === 1024) vector = candidate;
+    } catch (error) {
+      console.error('outcome embedding failed; persisting memory for later backfill', error instanceof Error ? error.message : 'unknown');
+    }
 
     const result = await withTransaction(async (client) => {
       const asset = await client.query<{ id: string }>(
@@ -51,7 +60,15 @@ export async function POST(req: NextRequest) {
         `INSERT INTO repair_memories
          (organization_id, asset_id, title, summary, outcome, embedding, source_event_id)
          VALUES ($1, $2, $3, $4, $5, $6::VECTOR, $7) RETURNING id`,
-        [organizationId, assetId, `${outcome === 'resolved' ? 'Successful' : 'Failed'} intervention on ${assetId}`, summary, outcome, `[${vector.join(',')}]`, event.rows[0].id],
+        [
+          organizationId,
+          assetId,
+          `${outcome === 'resolved' ? 'Successful' : 'Failed'} intervention on ${assetId}`,
+          summary,
+          outcome,
+          vector ? `[${vector.join(',')}]` : null,
+          event.rows[0].id,
+        ],
       );
 
       await client.query(
@@ -61,13 +78,19 @@ export async function POST(req: NextRequest) {
       await client.query(
         `INSERT INTO audit_events (organization_id, actor_type, actor_id, action, resource_type, resource_id, metadata)
          VALUES ($1, 'demo_user', $2, 'recorded_repair_outcome', 'repair_memory', $3, $4::JSONB)`,
-        [organizationId, 'demo-technician', memory.rows[0].id, JSON.stringify({ assetId, outcome, workOrderId: workOrder.rows[0].id })],
+        [organizationId, 'demo-technician', memory.rows[0].id, JSON.stringify({ assetId, outcome, workOrderId: workOrder.rows[0].id, embeddingPending: !vector })],
       );
 
       return { id: memory.rows[0].id, eventId: event.rows[0].id, workOrderId: workOrder.rows[0].id };
     });
 
-    return NextResponse.json({ mode: 'cockroachdb', ...result, status: 'persisted', outcome }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({
+      mode: 'cockroachdb',
+      ...result,
+      status: 'persisted',
+      outcome,
+      embeddingPending: !vector,
+    }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     if (error instanceof Error && error.message === 'ASSET_NOT_FOUND') {
       return NextResponse.json({ error: 'Asset is not available in the configured organization' }, { status: 404 });
