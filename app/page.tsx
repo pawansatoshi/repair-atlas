@@ -63,7 +63,7 @@ export default function Home(){
       const response=await fetch('/api/outcomes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assetId:'PRESS-204',outcome:'resolved',summary:'Intake obstruction confirmed. Airflow path cleared and filter replaced; overheating resolved without motor replacement.'})});
       const data=await response.json();
       if(!response.ok) throw new Error(data.error||'Unable to persist outcome');
-      setOutcome(true); setMessage(`${data.mode==='cockroachdb'?'CockroachDB':'Demo'} repair memory persisted${data.eventId?' and linked to the repair event':''}.`);
+      setOutcome(true); setMessage(`${data.mode==='cockroachdb'?'CockroachDB':'Demo'} repair memory persisted${data.eventId?' and linked to the repair event':''}. Work order completed.`);
     }catch(error){setMessage(error instanceof Error?error.message:'Unable to persist repair outcome');}
     finally{setBusy(false);}
   }
@@ -81,15 +81,16 @@ export default function Home(){
         {message&&<div role="status" aria-live="polite" className="pill" style={{marginBottom:14,padding:'9px 12px'}}>{message}</div>}
         <section className="grid">
           <div className="card">
-            <div className="card-head"><div><div className="card-title">Active incident</div><div className="muted" style={{fontSize:12,marginTop:4}}>Work order {workOrderId||'WO-2048'} · {approved?'Open':'Awaiting approval'}</div></div><span className="pill good">Human-in-the-loop</span></div>
+            <div className="card-head"><div><div className="card-title">Active incident</div><div className="muted" style={{fontSize:12,marginTop:4}}>Work order {workOrderId||'WO-2048'} · {outcome?'Completed':approved?'Open':'Awaiting approval'}</div></div><span className="pill good">Human-in-the-loop</span></div>
             <div className="asset"><div className="asset-top"><div><div className="eyebrow">Asset</div><h2>PRESS-204</h2><div className="muted" style={{fontSize:13,marginTop:5}}>Hydraulic press · Site 07 · Line B</div></div><span className="pill">Overheating</span></div>
               <div className="metrics"><div className="metric"><span className="muted" style={{fontSize:11}}>Current temp</span><strong>92°C</strong></div><div className="metric"><span className="muted" style={{fontSize:11}}>Runtime</span><strong>6h 18m</strong></div><div className="metric"><span className="muted" style={{fontSize:11}}>Memory hits</span><strong>{filtered.length}</strong></div></div>
             </div>
             <div className="card-head"><div className="card-title">Diagnostic workflow</div><span className="pill">Agent supervised</span></div>
             <div className="timeline">{logs.map(([a,b],i)=><div className="timeline-item" key={a}><div className="rail"><div className="node"/></div><div><div className="event-title">{i+1}. {a}</div><div className="event-copy">{b}</div></div></div>)}</div>
-            <div className="agent"><div className="agent-state"><span className="dot"/><div><strong style={{fontSize:13}}>Recommendation ready</strong><div className="muted" style={{fontSize:12,marginTop:3}}>{diagnosis}</div></div></div>
-              <div className="approval"><h3>Approval required · Create diagnostic work order</h3><p>This action changes operational state. RepairAtlas keeps consequential writes behind a human approval boundary.</p><div className="actions"><button className="btn primary" onClick={approveAction} disabled={busy||approved}>{approved?'Approved':'Approve action'}</button><button className="btn" onClick={()=>setEvidenceOpen(true)} disabled={busy}>Review evidence</button></div></div>
-              {approved&&<div className="approval" style={{marginTop:10,borderColor:'rgba(116,215,176,.25)',background:'rgba(116,215,176,.05)'}}><h3>Diagnostic work order created</h3><p>{workOrderId?'Work order '+workOrderId+' is open. ':''}Record the technician outcome to turn this experience into durable memory.</p><div className="actions"><button className="btn primary" onClick={recordOutcome} disabled={busy||outcome}>{outcome?'Outcome recorded':'Record successful repair'}</button></div></div>}
+            <div className="agent"><div className="agent-state"><span className="dot"/><div><strong style={{fontSize:13}}>{outcome?'Repair outcome recorded':'Recommendation ready'}</strong><div className="muted" style={{fontSize:12,marginTop:3}}>{diagnosis}</div></div></div>
+              {!outcome&&<div className="approval"><h3>Approval required · Create diagnostic work order</h3><p>This action changes operational state. RepairAtlas keeps consequential writes behind a human approval boundary.</p><div className="actions"><button className="btn primary" onClick={approveAction} disabled={busy||approved}>{approved?'Approved':'Approve action'}</button><button className="btn" onClick={()=>setEvidenceOpen(true)} disabled={busy}>Review evidence</button></div></div>}
+              {approved&&!outcome&&<div className="approval" style={{marginTop:10,borderColor:'rgba(116,215,176,.25)',background:'rgba(116,215,176,.05)'}}><h3>Diagnostic work order created</h3><p>{workOrderId?'Work order '+workOrderId+' is open. ':''}Record the technician outcome to turn this experience into durable memory.</p><div className="actions"><button className="btn primary" onClick={recordOutcome} disabled={busy}>{'Record successful repair'}</button></div></div>}
+              {outcome&&<div className="approval" style={{marginTop:10,borderColor:'rgba(116,215,176,.25)',background:'rgba(116,215,176,.05)'}}><h3>Repair completed · memory persisted</h3><p>{workOrderId?'Work order '+workOrderId+' is completed. ':''}The repair event and successful outcome are now durable operational memory.</p></div>}
             </div>
           </div>
           <aside className="card" id="memory">
