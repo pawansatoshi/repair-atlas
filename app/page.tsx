@@ -93,7 +93,12 @@ export default function Home(){
           </div>
           <aside className="card" id="memory">
             <div className="card-head"><div><div className="card-title">Repair memory</div><div className="muted" style={{fontSize:12,marginTop:4}}>{retrievalMode==='cockroachdb-vector'?'Semantic + transactional retrieval':'Evidence retrieval'}</div></div><span className={`pill ${retrievalMode==='cockroachdb-vector'?'good':''}`}>{retrievalMode==='cockroachdb-vector'?'Vector search':retrievalMode==='cockroachdb-recent'?'DB recent':'Demo memory'}</span></div>
-            <div style={{padding:14}}><label htmlFor="memory-search" className="muted" style={{fontSize:11}}>Describe the current symptom</label><input id="memory-search" className="search" value={query} onChange={e=>setQuery(e.target.value)} aria-describedby="search-help"/><div id="search-help" className="muted" style={{fontSize:11}}>Run diagnosis to query the configured memory layer. Local filtering only narrows the displayed evidence.</div></div>
+            <div className="memory-query">
+              <div className="query-title">Search repair memory</div>
+              <label htmlFor="memory-search">Type the current symptom or describe the new incident</label>
+              <input id="memory-search" className="search" value={query} onChange={e=>setQuery(e.target.value)} aria-describedby="search-help" placeholder="Example: PRESS-204 thermal rise during a long production cycle" />
+              <div id="search-help" className="query-help">Edit this field, then tap <strong>Run diagnosis</strong> to retrieve semantically similar repairs.</div>
+            </div>
             <div className="memory-list">{filtered.length?filtered.map(m=><div className="memory" key={m.id}><strong>{m.title}</strong><p>{m.summary||m.copy}</p><div className="score">{m.outcome==='resolved'?'✓ Successful outcome':'× Failed intervention'}{typeof m.relevance==='number'?` · ${Math.round(m.relevance*100)}% relevance`:''}</div></div>):<div className="empty">No matching memories. Try a broader symptom.</div>}</div>
             <div className="footer-note">CockroachDB stores the operational record and vector memory together. No second vector database is required.</div>
           </aside>
