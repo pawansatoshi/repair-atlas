@@ -2,7 +2,7 @@
 name = "repair-atlas-agent"
 version = "0.1.0"
 description = "RepairAtlas AgentCore runtime"
-requires-python = ">=3.12"
+requires-python = ">=3.14,<3.15"
 dependencies = [
   "bedrock-agentcore",
   "boto3",
