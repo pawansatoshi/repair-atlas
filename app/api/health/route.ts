@@ -7,6 +7,8 @@ export async function GET() {
   let database: 'connected' | 'not_configured' | 'unavailable' = db ? 'unavailable' : 'not_configured';
   let vectorMemory = false;
   let tablesReady = false;
+  let repairMemoryCount = 0;
+  let embeddedMemoryCount = 0;
 
   if (db) {
     try {
@@ -24,6 +26,13 @@ export async function GET() {
          WHERE index_name = 'repair_memories_embedding_idx'`,
       );
       vectorMemory = tablesReady && Number(indexCheck.rows[0]?.count || 0) > 0;
+      const memoryCounts = await db.query<{ total: string; embedded: string }>(
+        `SELECT count(*)::STRING AS total,
+                count(embedding)::STRING AS embedded
+         FROM repair_memories`,
+      );
+      repairMemoryCount = Number(memoryCounts.rows[0]?.total || 0);
+      embeddedMemoryCount = Number(memoryCounts.rows[0]?.embedded || 0);
     } catch {
       database = 'unavailable';
     }
@@ -32,6 +41,7 @@ export async function GET() {
   const degraded = database === 'unavailable' || (database === 'connected' && !tablesReady);
   const bedrock = hasRuntimeEnv('BEDROCK_MODEL_ID');
   const embeddings = hasRuntimeEnv('BEDROCK_EMBED_MODEL_ID');
+  const embeddingCoverage = repairMemoryCount > 0 ? embeddedMemoryCount / repairMemoryCount : 0;
 
   return NextResponse.json({
     status: degraded ? 'degraded' : 'ok',
@@ -41,6 +51,9 @@ export async function GET() {
     vectorMemory,
     bedrock,
     embeddings,
+    repairMemoryCount,
+    embeddedMemoryCount,
+    embeddingCoverage,
     mcp: hasRuntimeEnv('COCKROACH_MCP_URL'),
     runtimeConfigSource: process.env.secrets ? 'amplify-secrets-or-env' : 'environment',
     timestamp: new Date().toISOString(),
