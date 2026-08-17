@@ -28,11 +28,12 @@ export default function Home(){
   const [message,setMessage]=useState('');
   const [memories,setMemories]=useState<Memory[]>(demoMemories);
   const [retrievalMode,setRetrievalMode]=useState<'demo'|'cockroachdb-recent'|'cockroachdb-vector'>('demo');
+  const [evidenceOpen,setEvidenceOpen]=useState(false);
 
   const filtered=useMemo(()=>memories.filter(m=>`${m.title} ${m.summary||m.copy||''}`.toLowerCase().includes(query.toLowerCase().split(' ')[0]||'x')||query.toLowerCase().includes('press-204')),[query,memories]);
 
   async function runDiagnosis(){
-    setBusy(true); setMessage(''); setApproved(false); setOutcome(false); setWorkOrderId('');
+    setBusy(true); setMessage(''); setApproved(false); setOutcome(false); setWorkOrderId(''); setEvidenceOpen(false);
     try{
       const response=await fetch('/api/diagnose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assetId:'PRESS-204',symptom:query})});
       const data=await response.json();
@@ -87,7 +88,7 @@ export default function Home(){
             <div className="card-head"><div className="card-title">Diagnostic workflow</div><span className="pill">Agent supervised</span></div>
             <div className="timeline">{logs.map(([a,b],i)=><div className="timeline-item" key={a}><div className="rail"><div className="node"/></div><div><div className="event-title">{i+1}. {a}</div><div className="event-copy">{b}</div></div></div>)}</div>
             <div className="agent"><div className="agent-state"><span className="dot"/><div><strong style={{fontSize:13}}>Recommendation ready</strong><div className="muted" style={{fontSize:12,marginTop:3}}>{diagnosis}</div></div></div>
-              <div className="approval"><h3>Approval required · Create diagnostic work order</h3><p>This action changes operational state. RepairAtlas keeps consequential writes behind a human approval boundary.</p><div className="actions"><button className="btn primary" onClick={approveAction} disabled={busy||approved}>{approved?'Approved':'Approve action'}</button><button className="btn" onClick={runDiagnosis} disabled={busy}>Review evidence</button></div></div>
+              <div className="approval"><h3>Approval required · Create diagnostic work order</h3><p>This action changes operational state. RepairAtlas keeps consequential writes behind a human approval boundary.</p><div className="actions"><button className="btn primary" onClick={approveAction} disabled={busy||approved}>{approved?'Approved':'Approve action'}</button><button className="btn" onClick={()=>setEvidenceOpen(true)} disabled={busy}>Review evidence</button></div></div>
               {approved&&<div className="approval" style={{marginTop:10,borderColor:'rgba(116,215,176,.25)',background:'rgba(116,215,176,.05)'}}><h3>Diagnostic work order created</h3><p>{workOrderId?'Work order '+workOrderId+' is open. ':''}Record the technician outcome to turn this experience into durable memory.</p><div className="actions"><button className="btn primary" onClick={recordOutcome} disabled={busy||outcome}>{outcome?'Outcome recorded':'Record successful repair'}</button></div></div>}
             </div>
           </div>
@@ -107,5 +108,17 @@ export default function Home(){
       </main>
     </div>
     <nav className="mobile-nav" aria-label="Mobile navigation">{['overview','work orders','memory','assets'].map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)} aria-current={tab===x?'page':undefined}>{x}</button>)}</nav>
+    {evidenceOpen&&<div role="dialog" aria-modal="true" aria-label="Diagnostic evidence" style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(3,8,12,.78)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setEvidenceOpen(false)}>
+      <div className="card" style={{width:'min(760px,100%)',maxHeight:'85vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.45)'}} onClick={e=>e.stopPropagation()}>
+        <div className="card-head"><div><div className="eyebrow">Evidence review</div><div className="card-title" style={{fontSize:20,marginTop:5}}>Why RepairAtlas recommends this action</div></div><button className="btn" onClick={()=>setEvidenceOpen(false)}>Close</button></div>
+        <div style={{display:'grid',gap:12,marginTop:16}}>
+          <div className="memory" style={{borderColor:'rgba(116,215,176,.25)'}}><strong>1 · Retrieved memory</strong><p>{memories[0]?.title||'No top memory returned'}</p><div className="score">{memories[0]?.relevance!=null?`${Math.round(memories[0].relevance*100)}% relevance`:'Vector-ranked evidence'}</div></div>
+          <div className="memory"><strong>2 · Compared outcomes</strong><p>Successful airflow/filter interventions are preferred over the prior failed fan replacement.</p><div className="score">Success + failure evidence considered</div></div>
+          <div className="memory"><strong>3 · Agent reasoning</strong><p>{diagnosis}</p><div className="score">Bedrock reasoning + retrieved operational memory</div></div>
+          <div className="memory"><strong>4 · Safety policy</strong><p>No consequential write is executed automatically. Creating the diagnostic work order requires explicit human approval.</p><div className="score">Human-in-the-loop boundary enforced</div></div>
+        </div>
+        <div className="footer-note" style={{marginTop:16}}>This evidence view is read-only. Closing it returns you to the approval boundary.</div>
+      </div>
+    </div>}
   </div>
 }
