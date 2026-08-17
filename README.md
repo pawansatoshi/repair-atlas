@@ -40,7 +40,7 @@ The same CockroachDB system of record holds transactional state, repair events, 
 |---|---|---|
 | Product UI + APIs | Next.js 15 + React 19 | Responsive operations console and server APIs |
 | Agent reasoning | Amazon Bedrock | Bounded diagnostic recommendation |
-| Agent runtime | Amazon Bedrock AgentCore Runtime | AWS-hosted agent execution and observability |
+| Agent runtime | Amazon Bedrock AgentCore Runtime | AWS-hosted bounded agent runtime (runtime deployment/invocation remains the final external gate) |
 | System of record | CockroachDB Cloud | Transactional operational state + durable memory |
 | Semantic memory | CockroachDB Distributed Vector Indexing | Similarity retrieval without a second vector database |
 | Agent/database interface | CockroachDB Managed MCP Server | Governed AI access to CockroachDB |
@@ -55,13 +55,7 @@ Amazon Titan Text Embeddings V2 produces 1,024-dimensional vectors, matching `VE
 **Asset:** `PRESS-204`  
 **Symptom:** overheating after extended operation.
 
-The agent can retrieve three relevant experiences:
-
-1. A successful airflow/filter intervention.
-2. A failed fan replacement.
-3. Another successful intake/filter intervention.
-
-It recommends checking airflow before replacing the motor, explains the evidence, and requires explicit approval before creating a diagnostic work order. The technician outcome becomes a repair event and durable memory, closing the learning loop.
+The agent retrieves relevant experiences including a successful airflow/filter intervention and a failed fan replacement. It recommends checking airflow before replacing the motor, explains the evidence, and requires explicit approval before creating a diagnostic work order. The technician outcome becomes a repair event and durable memory, closing the learning loop.
 
 ## Run locally
 
@@ -102,8 +96,6 @@ The MCP configuration example is in `.mcp.json.example`. Use the exact authentic
 
 The hackathon requires the project to be deployed on AWS and to use at least one AWS service. The repository contains an AWS Amplify Hosting build specification for the Next.js application and an Amazon Bedrock AgentCore runtime implementation.
 
-AWS Amplify currently documents Next.js SSR deployment through its managed compute provider; this repository pins Next.js to the supported 15.x line for the AWS deployment path.
-
 For the AWS deployment, connect this GitHub repository to Amplify Hosting, configure the server-side environment variables/secrets, deploy the branch, then deploy and verify the AgentCore runtime. AWS documents Git-connected Next.js deployment and environment-variable configuration in Amplify.
 
 Required runtime configuration includes:
@@ -123,6 +115,8 @@ Do not place secrets in source control. Use the AWS deployment console/secret me
 ## AgentCore
 
 The bounded agent is in `agentcore/repair_agent.py`. It embeds the incident with Bedrock, retrieves asset-scoped vector memory from CockroachDB, and asks Bedrock for a bounded recommendation. The current AWS AgentCore CLI workflow is documented in `agentcore/README.md`.
+
+Current release state: the **web application’s live production Bedrock/vector loop is verified**; an independent deployed AgentCore runtime invocation is the remaining external verification gate.
 
 ## API surface
 
@@ -161,36 +155,40 @@ The UI is designed for mobile, tablet, laptop and desktop without browser deskto
 - External model output is treated as untrusted input.
 - Errors do not expose stack traces or credentials.
 
-## Debugging and verification record
+## Verified production evidence
 
-The dated verification record is maintained in `docs/DEBUGGING_LOG_2026-08-16.md`.
+The live AWS Amplify deployment has been manually exercised on mobile and verified to:
 
-Important findings already resolved include CloudShell dependency/tooling issues, filesystem pressure during dependency installation, missing Git author identity, GitHub HTTPS password-authentication failure, remote non-fast-forward synchronization, and the original embedding UUID validation/persistence defect.
+- load the production application
+- report the memory system as ready
+- retrieve real CockroachDB vector memories
+- use Amazon Bedrock reasoning
+- show 1,024-dimensional embedding health
+- compare successful and failed interventions
+- require explicit human approval for work-order creation
+- persist the work order
+- record and complete a successful repair outcome
+- persist the repair event and memory
+- retrieve the memory again after refresh
+- expose a read-only evidence review explaining retrieval, comparison, reasoning, and policy
 
-The current AWS deployment finding is different: **Amplify build and deployment are successful, but the displayed public branch domain currently returns a DNS resolution error in the tested mobile browser.** This is an open deployment-access verification item, not evidence of a failed build. Vercel is not required while the AWS Amplify path is being validated.
-
-The repository deliberately distinguishes verified PASS states from unresolved/untested states; see the debugging log before repeating tests or changing architecture.
+A production health probe also returned `status: ok`, database connectivity, ready tables, vector memory, Bedrock, embeddings, MCP, full embedding coverage, and `embeddingProbe.ok=true` with `dimensions=1024` during the final verification session.
 
 ## Demo discipline
 
-The final hackathon demo must show **real persistence and the real memory loop**. Hard-coded results are only fallback/demo evidence and are explicitly labeled. The submission video must show the project functioning and show CockroachDB memory at work, as required by the official rules.
+The final hackathon demo must show **real persistence and the real memory loop**. Hard-coded results are only fallback/demo evidence and are explicitly labeled. The submission video should show the real production flow and evidence rather than relying on screenshots alone.
 
 ## Hackathon submission checklist
 
-The official submission requires a public repository, functional demo URL, English text description/testing instructions, a public video under three minutes, identification of CockroachDB and AWS tools used, and a project deployed on AWS.
+The submission should include the public repository, functional AWS-hosted demo URL, English description/testing instructions, public video under three minutes, identification of CockroachDB and AWS tools used, and the deployed AWS application.
 
-Submission deadline: **August 18, 2026 at 5:00 PM EDT**.
+Submission deadline recorded in project materials: **August 18, 2026 at 5:00 PM EDT**.
 
-## Status
+## Final release status
 
-**Database foundation:** verified against CockroachDB Cloud.  
-**Application integration:** implemented in repository.  
-**Local automated quality gates:** verified — typecheck, lint, tests (4/4), and Next.js production build pass.  
-**AWS Amplify build:** verified successful.  
-**AWS Amplify deployment:** verified successful; Amplify reports `Deployed` and `Deployment complete`.  
-**Public Amplify URL:** **NOT YET VERIFIED** — current mobile-browser test returned `DNS_PROBE_POSSIBLE`.  
-**Live Bedrock/AgentCore full-loop:** not yet verified.  
-**Final release:** **NOT READY** until public access, real end-to-end cloud interaction, production telemetry, video, and the final QA/release gate are verified.
+**PASS — verified production web loop:** database, vector retrieval, Bedrock reasoning, human approval, work-order persistence, outcome persistence, memory persistence, refresh persistence, and mobile interaction.  
+**PENDING — external AgentCore gate:** independent AWS AgentCore runtime deployment/invocation evidence.  
+**SUBMISSION READINESS:** ready for final AgentCore verification; do not claim AgentCore runtime execution until it is actually observed.
 
 ## License
 
