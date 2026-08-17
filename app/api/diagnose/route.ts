@@ -56,11 +56,6 @@ async function backfillMissingEmbeddings(organizationId: string, assetId: string
 
 async function vectorMemories(organizationId: string, assetId: string, vector: number[]): Promise<MemoryRow[]> {
   const vectorLiteral = `[${vector.join(',')}]`;
-
-  // CockroachDB's current vector-index documentation centers the indexed
-  // ANN path on L2 (<->) search with equality filters on prefix columns.
-  // Use the same shape for the production query; with only a few memories
-  // this is also a deterministic exact KNN scan if the index is not used.
   const result = await query<MemoryRow>(
     `WITH scoped_memories AS (
        SELECT id, title, summary, outcome, embedding
@@ -132,7 +127,7 @@ export async function POST(req: NextRequest) {
     const context = memories.length
       ? JSON.stringify(memories.map((memory) => ({ ...memory, distance: memory.distance })))
       : 'No matching historical records were found. Do not invent historical evidence.';
-    const prompt = `You are RepairAtlas, a field-repair diagnostic assistant. Asset: ${assetId}. Current symptom: ${symptom}. Historical evidence: ${context}. Provide a concise recommendation grounded only in the supplied evidence. Clearly distinguish successful and failed interventions. Never invent measurements, parts, causes, or certainty. Do not authorize destructive or consequential actions. Recommendation:`;
+    const prompt = `You are RepairAtlas, a field-repair diagnostic assistant. Asset: ${assetId}. Current symptom: ${symptom}. Historical evidence: ${context}. Provide a concise recommendation grounded only in the supplied evidence. Clearly distinguish successful and failed interventions. Treat failed interventions as negative evidence and do not recommend repeating them. Never invent measurements, parts, causes, or certainty. Do not authorize destructive or consequential actions. Recommendation:`;
 
     let recommendation: string | undefined;
     let reasoningAvailable = false;
@@ -153,9 +148,10 @@ export async function POST(req: NextRequest) {
       reasoningAvailable,
       assetId,
       recommendation,
-      memories: memories.map((memory) => ({
+      memories: memories.map((memory, index) => ({
         ...memory,
-        relevance: typeof memory.distance === 'number' ? 1 / (1 + Number(memory.distance)) : undefined,
+        rank: index + 1,
+        distance: typeof memory.distance === 'number' ? Number(memory.distance) : undefined,
       })),
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
