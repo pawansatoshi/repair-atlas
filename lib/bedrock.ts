@@ -1,8 +1,8 @@
 import { BedrockRuntimeClient, ConverseCommand, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { getRuntimeEnv } from './env';
 
-const reasoningRegion = getRuntimeEnv('BEDROCK_REGION') || 'us-east-1';
-const embeddingRegion = getRuntimeEnv('BEDROCK_EMBED_REGION') || 'eu-north-1';
+const reasoningRegion = getRuntimeEnv('BEDROCK_REGION') || getRuntimeEnv('AWS_REGION') || 'us-east-1';
+const embeddingRegion = getRuntimeEnv('BEDROCK_EMBED_REGION') || getRuntimeEnv('AWS_REGION') || 'us-east-1';
 
 const reasoningClient = new BedrockRuntimeClient({ region: reasoningRegion });
 const embeddingClient = new BedrockRuntimeClient({ region: embeddingRegion });
@@ -26,7 +26,12 @@ function parseEmbedding(payload: unknown): number[] | undefined {
 }
 
 async function gatewayEmbedding(text: string, endpoint: string): Promise<number[] | undefined> {
-  const bodyCandidates = [{ inputText: text.slice(0, 8000) }, { text: text.slice(0, 8000) }];
+  const bodyCandidates = [
+    { inputText: text.slice(0, 8000), dimensions: 1024, normalize: true },
+    { inputText: text.slice(0, 8000) },
+    { text: text.slice(0, 8000) },
+  ];
+
   for (const body of bodyCandidates) {
     try {
       const response = await fetch(endpoint, {
@@ -50,12 +55,23 @@ export async function embed(text: string): Promise<number[] | undefined> {
   const modelId = getRuntimeEnv('BEDROCK_EMBED_MODEL_ID');
   if (!modelId) return undefined;
 
+  // Prefer the verified RepairAtlas embedding gateway. This keeps the
+  // production app independent of the Amplify compute role's Bedrock
+  // permissions while still using the same Titan V2 1024-dim embedding model.
+  const endpoint = getRuntimeEnv('REPAIR_ATLAS_EMBEDDING_API_URL');
+  if (endpoint) {
+    const gatewayVector = await gatewayEmbedding(text, endpoint);
+    if (gatewayVector) return gatewayVector;
+  }
+
+  // Direct Bedrock fallback for environments where the SSR compute role is
+  // explicitly granted bedrock:InvokeModel in the embedding region.
   try {
     const command = new InvokeModelCommand({
       modelId,
       contentType: 'application/json',
       accept: 'application/json',
-      body: JSON.stringify({ inputText: text.slice(0, 8000) }),
+      body: JSON.stringify({ inputText: text.slice(0, 8000), dimensions: 1024, normalize: true }),
     });
     const response = await embeddingClient.send(command);
     const data = JSON.parse(new TextDecoder().decode(response.body));
@@ -65,9 +81,7 @@ export async function embed(text: string): Promise<number[] | undefined> {
     console.error('bedrock embedding failed', error instanceof Error ? error.message : 'unknown');
   }
 
-  const endpoint = getRuntimeEnv('REPAIR_ATLAS_EMBEDDING_API_URL');
-  if (!endpoint) return undefined;
-  return gatewayEmbedding(text, endpoint);
+  return undefined;
 }
 
 export async function reason(prompt: string): Promise<string | undefined> {
