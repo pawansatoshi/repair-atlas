@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { embed, reason } from '@/lib/bedrock';
 import { query } from '@/lib/db';
+import { getRuntimeEnv } from '@/lib/env';
 
 const inputSchema = z.object({
-  assetId: z.string().trim().min(1).max(100),
+  assetId: z.string().trim().min(1).max(1000),
   symptom: z.string().trim().min(1).max(1000),
 }).strict();
 
@@ -21,8 +22,8 @@ export async function POST(req: NextRequest) {
     if (!body.success) return NextResponse.json({ error: 'assetId and symptom are required and must be valid strings' }, { status: 400 });
 
     const { assetId, symptom } = body.data;
-    const organizationId = process.env.DEMO_ORG_ID || 'demo-org';
-    const hasDatabase = Boolean(process.env.DATABASE_URL);
+    const organizationId = getRuntimeEnv('DEMO_ORG_ID') || 'demo-org';
+    const hasDatabase = Boolean(getRuntimeEnv('DATABASE_URL'));
     let memories: MemoryRow[] = [];
     let retrievalMode: 'cockroachdb-vector' | 'cockroachdb-recent' | 'demo' = 'demo';
 
@@ -59,13 +60,13 @@ export async function POST(req: NextRequest) {
     }
 
     const context = memories.length
-      ? JSON.stringify(memories.map((memory) => ({ ...memory, distance: memory.distance })) )
+      ? JSON.stringify(memories.map((memory) => ({ ...memory, distance: memory.distance })))
       : 'No matching historical records were found. Do not invent historical evidence.';
     const prompt = `You are RepairAtlas, a field-repair diagnostic assistant. Asset: ${assetId}. Current symptom: ${symptom}. Historical evidence: ${context}. Provide a concise recommendation grounded only in the supplied evidence. Clearly distinguish successful and failed interventions. Never invent measurements, parts, causes, or certainty. Do not authorize destructive or consequential actions. Recommendation:`;
     const recommendation = await reason(prompt) || fallback;
 
     return NextResponse.json({
-      mode: process.env.BEDROCK_MODEL_ID ? 'bedrock' : 'bounded-demo',
+      mode: getRuntimeEnv('BEDROCK_MODEL_ID') ? 'bedrock' : 'bounded-demo',
       retrievalMode,
       assetId,
       recommendation,
