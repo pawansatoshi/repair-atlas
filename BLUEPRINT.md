@@ -1,394 +1,120 @@
-# RepairAtlas — Product and Architecture Blueprint
+# RepairAtlas — Product & Architecture
 
-> **Implementation status snapshot — 2026-08-16:** The Bedrock → Lambda/API → CockroachDB embedding/persistence slice is verified for the tested repair memory, including 1,024-dimensional storage, semantic retrieval, UUID validation, required-field validation, and safe nonexistent-memory handling. The complete agentic memory loop is **not yet verified**. Read `docs/HANDOFF_PROGRESS_2026-08-16.md` before continuing implementation.
+## Product thesis
 
-## 1. Product thesis
+RepairAtlas turns completed repairs into durable operational memory that improves the next repair.
 
-**RepairAtlas turns every completed repair into institutional memory that improves the next repair.**
-
-The product is not a chatbot with chat history. It is an operational agent that combines current asset state, historical repair experiences, semantic retrieval, controlled actions, and outcome learning.
-
-## 2. Design principles
-
-RepairAtlas is designed around these principles:
-
-- solve a real field-service problem rather than a generic chat use case
-- use an agent where retrieval, comparison, policy, and workflow action provide real value
-- make persistent repair experience a first-class data model
-- keep CockroachDB as the transactional system of record and vector-memory store
-- tie AWS services to concrete runtime responsibilities
-- keep consequential actions observable and approval-gated
-- prefer a small evidence set and explainable recommendations over opaque automation
-
-## 3. Target user
-
-Primary user: field-service technician or maintenance operator.
-
-Initial vertical: industrial equipment repair.
-
-Expansion opportunities: solar maintenance, HVAC, telecom infrastructure, generators, pumps, manufacturing equipment, utilities, and fleet operations.
-
-## 4. Problem
-
-Operational knowledge is fragmented across work orders, technician notes, manuals, memory, and individual experience. A new incident often forces a technician to repeat diagnostic work that another technician already completed.
-
-The highest-value information is not merely a document. It is an **experience**:
-
-- symptoms
-- diagnosis
-- attempted intervention
-- failed intervention
-- successful intervention
-- parts used
-- observed conditions
-- final outcome
-
-## 5. Agent loop
+It is an operations console, not a chat-history demo. The core loop is:
 
 ```text
-1. Observe current failure
-2. Identify asset and current state
-3. Retrieve relevant repair experiences
-4. Retrieve supporting documentation
-5. Compare previous outcomes
-6. Produce a bounded diagnostic recommendation
-7. Check action policy
-8. Request approval where required
-9. Execute permitted workflow action
-10. Capture technician outcome
-11. Convert outcome into durable memory
-12. Reuse that memory on future incidents
+incident
+  ↓
+asset-scoped memory retrieval
+  ↓
+success / failure comparison
+  ↓
+bounded recommendation
+  ↓
+human approval
+  ↓
+work-order
+  ↓
+repair outcome
+  ↓
+durable repair memory
+  ↓
+future incident
 ```
 
-## 6. Agent tool contract
+## Current implementation
 
-### Read tools
+### Web application
 
-- `get_asset`
-- `get_asset_history`
-- `get_open_work_orders`
-- `search_repair_memory`
-- `get_parts`
-- `search_documents`
+- Next.js 15 + React 19
+- AWS Amplify Hosting
+- server-side API routes
+- mobile/tablet/desktop operations UI
 
-### Controlled write tools
+### Reasoning and embeddings
 
-- `create_work_order`
-- `update_work_order`
-- `record_repair_outcome`
-- `create_repair_memory`
+- Amazon Bedrock for diagnostic reasoning
+- Amazon Titan Text Embeddings V2 for 1,024-dimensional embeddings
+- model output is treated as untrusted input
+- recommendations are bounded by retrieved evidence
 
-### Forbidden operations
+### Operational system of record
 
-- delete repair history
-- alter audit history
-- schema modification
-- credential access
-- unrestricted administrative SQL
+CockroachDB Cloud stores:
 
-## 7. Memory model
+- organizations
+- assets
+- work orders
+- repair events
+- repair memories
+- agent sessions/actions
+- audit events
 
-### Operational memory
+Repair memories use `VECTOR(1024)` and CockroachDB vector indexing. Retrieval is scoped by the configured organization and asset.
 
-Current transactional state.
+### AgentCore
 
-Examples: asset status, work-order status, assigned technician, inventory state.
+The AgentCore CLI project is under `app/RepairAtlas/`.
 
-### Episodic memory
+- entrypoint: `app/RepairAtlas/main.py`
+- Python: 3.14
+- runtime configuration: `agentcore/agentcore.json`
+- CodeZip location: `app/RepairAtlas/`
+- protocol: HTTP
+- network mode: PUBLIC
 
-A concrete experience.
+The runtime implementation performs embedding, CockroachDB vector retrieval, and bounded Bedrock reasoning. **Independent deployed AgentCore invocation is still pending and is not described as verified.**
 
-Examples: symptoms, diagnosis, action, outcome, technician observation.
-
-### Semantic memory
-
-Vectorized representations of repair experiences for similarity retrieval.
-
-### Learned memory
-
-Structured conclusions derived from outcomes, especially successful and failed interventions.
-
-### Audit memory
-
-Immutable record of agent actions, approvals, tool calls, results, and timestamps.
-
-## 8. Proposed database model
-
-```text
-organizations
-users
-sites
-assets
-asset_events
-work_orders
-diagnostic_steps
-repair_events
-parts
-repair_parts
-repair_memories
-documents
-agent_sessions
-agent_actions
-audit_events
-```
-
-### `assets`
-
-Current identity and state of physical equipment.
-
-### `asset_events`
-
-Chronological operational events and symptoms.
-
-### `work_orders`
-
-Transactional lifecycle of a service job.
-
-### `repair_events`
-
-What a technician actually did and what happened afterward.
-
-### `repair_memories`
-
-Normalized experience summary plus embedding, outcome, confidence, and source event.
-
-## 9. Vector strategy
-
-Use CockroachDB vector capabilities for semantic retrieval while preserving relational scope.
-
-The preferred retrieval strategy is:
-
-```text
-current asset
-   ↓
-asset/model/site relevance filter
-   ↓
-semantic similarity
-   ↓
-outcome-aware ranking
-   ↓
-small evidence set
-   ↓
-agent reasoning
-```
-
-Do not introduce Pinecone, Weaviate, Qdrant, Chroma, or another vector database unless a future requirement proves CockroachDB insufficient.
-
-**Verified implementation slice:** `repair_memories.embedding` is `VECTOR(1024)`, Titan Text Embeddings V2 returns 1,024 dimensions, a real memory has been persisted, and CockroachDB vector-distance retrieval returns the expected repair memory.
-
-## 10. Outcome-aware memory
-
-A critical product property is remembering both successful and unsuccessful attempts.
-
-Example:
-
-```text
-Attempt A: replace fan
-Outcome: failed
-
-Attempt B: clean intake + replace filter
-Outcome: resolved
-```
-
-A future agent should not merely retrieve both records. It should understand that B has stronger historical evidence for the observed pattern and that A should not be repeated without new evidence.
-
-## 11. AWS architecture
-
-### Amazon Bedrock
-
-Model inference and reasoning.
-
-### Amazon Bedrock AgentCore Runtime
-
-Target runtime for bounded agent execution, session isolation, authorization integration, observability, and runtime scaling.
-
-### Amazon S3
-
-Target location for service manuals, equipment documentation, maintenance artifacts, and generated reports when document retrieval is implemented.
-
-The architecture should not use AWS as a checkbox. Each AWS component should have a concrete job in the execution path.
-
-**Current verified path:** API Gateway → Lambda (`repair-atlas-bedrock`) → Amazon Bedrock Titan Text Embeddings V2 → CockroachDB. AgentCore Runtime and S3 are target architecture components and are not marked verified until directly exercised.
-
-## 12. CockroachDB architecture
-
-### Capability 1 — Distributed Vector Indexing
-
-Provides semantic retrieval over repair experiences.
-
-### Capability 2 — Managed MCP Server
-
-Provides a governed MCP interface for agent/database interaction when configured and authorized.
-
-The agent should have narrowly scoped permissions and should not receive unrestricted administrative access.
-
-**Current verification:** CockroachDB persistence and vector retrieval are proven for the tested repair-memory path. Managed MCP integration remains open for independent end-to-end verification.
-
-## 13. Security model
-
-```text
-Technician
-    ↓
-Application authentication
-    ↓
-Agent session
-    ↓
-Tool policy
-    ↓
-MCP authorization
-    ↓
-CockroachDB role permissions
-    ↓
-Transactional operation
-    ↓
-Audit event
-```
-
-Consequential operations require approval. Read operations can be automatic where policy allows.
-
-## 14. UI model
-
-The primary interface is an operations console, not a chat-only UI.
-
-### Screen areas
-
-1. Asset/work-order navigation
-2. Active diagnostic workflow
-3. Retrieved repair memory
-4. Agent activity and action status
-5. Approval controls
-6. Repair outcome capture
-
-The UI should make the memory loop visually obvious.
-
-## 15. Golden scenario
-
-### Incident 1
+## Golden scenario
 
 `PRESS-204` reports overheating after extended operation.
 
-### Retrieval
+The application retrieves previous repair experiences, including successful airflow/filter interventions and a failed fan replacement. The recommendation favors inspection of airflow before motor replacement. Creating the diagnostic work order requires explicit approval. The technician outcome is persisted as both an operational repair event and durable semantic memory.
 
-The agent finds previous semantically similar cases.
+## Safety boundary
 
-### Comparison
+Model output cannot directly create a consequential work order. The web API requires `approved: true`, validates the asset against the configured organization, performs the write transactionally, and records an audit event.
 
-One previous fan replacement failed. One airflow intervention succeeded.
+Repair outcomes likewise require an existing open/staged work order and are written transactionally with the repair event and memory.
 
-### Decision
+## Scope and authentication
 
-Agent recommends checking airflow before replacing the motor.
+The current hackathon deployment uses a server-configured organization scope (`DEMO_ORG_ID`) rather than end-user authentication. This is intentional for the demonstrated MVP but means it is **not yet a general multi-tenant production identity system**.
 
-### Action
+Production hardening would add an identity provider, authenticated sessions, role-based authorization, stronger tenant isolation, and corresponding adversarial tests.
 
-Technician approves creation of a diagnostic work order.
+## MCP
 
-### Outcome
+CockroachDB Managed MCP configuration is supported as a configured/reachability path. It is not presented as an independently verified autonomous agent write path unless direct runtime evidence exists.
 
-Intake obstruction is confirmed and the repair succeeds.
+## Evidence policy
 
-### Learning
+Only observed behavior is marked verified. Planned architecture, configuration, source code, or documentation does not count as runtime evidence.
 
-The successful repair becomes a new semantic experience.
+`UNKNOWN != PASS`
 
-### Incident 2
+## Release boundary
 
-The same asset reports a differently worded overheating/airflow symptom.
+Verified in the deployed web application:
 
-### Payoff
+- CockroachDB persistence
+- vector retrieval
+- Bedrock reasoning
+- successful/failed intervention comparison
+- approval-gated work-order creation
+- repair-outcome persistence
+- durable memory persistence
+- refresh persistence
+- mobile interaction
 
-The agent retrieves the prior successful experience and uses it in the new recommendation.
+Pending:
 
-## 16. Definition of done for the MVP
+1. independent AgentCore deployment/invocation evidence
+2. final security/configuration review
+3. final judge/submission evidence package
 
-The MVP is complete only when the following closed loop works against real persistence:
-
-```text
-failure
-→ retrieve memory
-→ agent recommendation
-→ approval
-→ work-order write
-→ repair outcome
-→ memory write
-→ semantic retrieval on later failure
-```
-
-Hard-coded demo results do not count.
-
-**Current status:** the persistence/embedding/retrieval building block is verified, but the complete closed loop above is still open.
-
-## 17. Engineering quality gates
-
-### Functional
-
-- [ ] fresh setup works
-- [x] database connection works for the verified Lambda path
-- [x] vector retrieval works for the tested repair-memory path
-- [ ] agent works end-to-end
-- [ ] MCP path works end-to-end
-- [x] memory persists for the tested record
-- [ ] memory updates after outcome in the complete workflow
-- [x] AWS execution works for the verified embedding path
-- [x] tested API failure states are handled
-
-### Security
-
-- [ ] no secrets in Git
-- [ ] least privilege
-- [ ] scoped DB credentials
-- [ ] constrained tools
-- [ ] approval boundaries
-- [ ] safe logging
-
-### UX
-
-- [ ] desktop
-- [ ] tablet
-- [ ] mobile
-- [ ] loading states
-- [ ] empty states
-- [ ] error states
-- [ ] no overflow
-- [ ] keyboard/touch usability
-
-### Reliability
-
-- [ ] model timeout handling
-- [ ] database error handling
-- [ ] retry policy
-- [ ] idempotent writes where appropriate
-- [ ] graceful degradation
-
-## 18. Current MVP non-goals
-
-Avoid adding complexity that does not improve the core repair-memory workflow:
-
-- hardware integration
-- voice interface
-- multi-agent swarm
-- blockchain
-- autonomous purchasing
-- large integration marketplace
-- second vector database
-- unnecessary analytics suite
-
-## 19. Product evolution
-
-```text
-MVP
-  ↓
-Industrial repair
-  ↓
-Multi-site field operations
-  ↓
-Predictive maintenance signals
-  ↓
-Parts and inventory intelligence
-  ↓
-Technician knowledge transfer
-  ↓
-Enterprise field-service platform
-```
-
-The initial product remains intentionally narrow while the architecture stays extensible.
+No additional architecture should be added unless it directly improves one of those release items.
