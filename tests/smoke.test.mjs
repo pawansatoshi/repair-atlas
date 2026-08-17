@@ -14,13 +14,27 @@ const requiredFiles = [
   'app/api/work-orders/route.ts',
   'app/api/outcomes/route.ts',
   'database/schema.sql',
-  'agentcore/repair_agent.py',
+  'agentcore/agentcore.json',
+  'app/RepairAtlas/main.py',
+  'app/RepairAtlas/pyproject.toml',
   '.mcp.json.example',
 ];
 
 test('RepairAtlas release contract names all core layers', () => {
   assert.ok(requiredFiles.length >= 10);
   for (const file of requiredFiles) assert.doesNotThrow(() => readFileSync(file, 'utf8'));
+});
+
+test('AgentCore configuration targets the checked-in runtime entrypoint', () => {
+  const config = readFileSync('agentcore/agentcore.json', 'utf8');
+  const runtime = readFileSync('app/RepairAtlas/main.py', 'utf8');
+  const pyproject = readFileSync('app/RepairAtlas/pyproject.toml', 'utf8');
+  assert.match(config, /"entrypoint":\s*"main\.py"/);
+  assert.match(config, /"codeLocation":\s*"app\/RepairAtlas\/"/);
+  assert.match(config, /"runtimeVersion":\s*"PYTHON_3_14"/);
+  assert.match(runtime, /BedrockAgentCoreApp/);
+  assert.match(runtime, /@app\.entrypoint/);
+  assert.match(pyproject, /requires-python\s*=\s*">=3\.14,<3\.15"/);
 });
 
 test('schema keeps semantic memory and operational state together', () => {
