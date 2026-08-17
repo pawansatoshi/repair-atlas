@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { query, withTransaction } from '@/lib/db';
+import { getRuntimeEnv } from '@/lib/env';
 
 const inputSchema = z.object({
   approved: z.literal(true),
@@ -16,8 +17,8 @@ export async function POST(req: NextRequest) {
     if (!body.success) return NextResponse.json({ error: 'explicit approval and a valid assetId are required' }, { status: 400 });
 
     const { assetId } = body.data;
-    const organizationId = process.env.DEMO_ORG_ID || 'demo-org';
-    if (!process.env.DATABASE_URL) return NextResponse.json({ mode: 'demo', id: 'WO-2049', status: 'staged' });
+    const organizationId = getRuntimeEnv('DEMO_ORG_ID') || 'demo-org';
+    if (!getRuntimeEnv('DATABASE_URL')) return NextResponse.json({ mode: 'demo', id: 'WO-2049', status: 'staged' });
 
     const existing = await query<{ id: string; status: string }>(
       `SELECT id, status FROM work_orders
