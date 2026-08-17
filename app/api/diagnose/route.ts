@@ -25,6 +25,35 @@ async function recentMemories(organizationId: string, assetId: string): Promise<
   return result.rows;
 }
 
+async function backfillMissingEmbeddings(organizationId: string, assetId: string): Promise<number> {
+  const result = await query<MemoryRow>(
+    `SELECT id, title, summary, outcome
+     FROM repair_memories
+     WHERE organization_id = $1 AND asset_id = $2 AND embedding IS NULL
+     ORDER BY created_at ASC
+     LIMIT 20`,
+    [organizationId, assetId],
+  );
+
+  let filled = 0;
+  for (const memory of result.rows) {
+    try {
+      const vector = await embed(`${assetId} ${memory.title} ${memory.summary} ${memory.outcome}`);
+      if (!vector || vector.length !== 1024) continue;
+      await query(
+        `UPDATE repair_memories
+         SET embedding = $1::VECTOR
+         WHERE id = $2 AND organization_id = $3 AND asset_id = $4 AND embedding IS NULL`,
+        [`[${vector.join(',')}]`, memory.id, organizationId, assetId],
+      );
+      filled += 1;
+    } catch (error) {
+      console.error('memory embedding backfill failed', error instanceof Error ? error.message : 'unknown');
+    }
+  }
+  return filled;
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!req.headers.get('content-type')?.toLowerCase().includes('application/json')) {
@@ -39,6 +68,7 @@ export async function POST(req: NextRequest) {
     let memories: MemoryRow[] = [];
     let retrievalMode: 'cockroachdb-vector' | 'cockroachdb-recent' | 'demo' = 'demo';
     let embeddingAvailable = false;
+    let backfilledEmbeddings = 0;
 
     let vector: number[] | undefined;
     try {
@@ -49,6 +79,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (vector && hasDatabase) {
+      backfilledEmbeddings = await backfillMissingEmbeddings(organizationId, assetId);
       try {
         const vectorLiteral = `[${vector.join(',')}]`;
         const result = await query<MemoryRow>(
@@ -60,7 +91,7 @@ export async function POST(req: NextRequest) {
           [vectorLiteral, organizationId, assetId],
         );
         memories = result.rows;
-        retrievalMode = 'cockroachdb-vector';
+        if (memories.length) retrievalMode = 'cockroachdb-vector';
       } catch (error) {
         console.error('diagnosis vector retrieval failed', error instanceof Error ? error.message : 'unknown');
       }
@@ -103,6 +134,7 @@ export async function POST(req: NextRequest) {
       mode: reasoningAvailable ? 'bedrock' : 'bounded-demo',
       retrievalMode,
       embeddingAvailable,
+      backfilledEmbeddings,
       reasoningAvailable,
       assetId,
       recommendation,
