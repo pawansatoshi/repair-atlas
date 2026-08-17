@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { embed } from '@/lib/bedrock';
 import { withTransaction } from '@/lib/db';
+import { getRuntimeEnv } from '@/lib/env';
 
 const inputSchema = z.object({
   assetId: z.string().trim().min(1).max(100),
@@ -18,8 +19,8 @@ export async function POST(req: NextRequest) {
     if (!body.success) return NextResponse.json({ error: 'assetId, summary and outcome are required' }, { status: 400 });
 
     const { assetId, summary, outcome } = body.data;
-    const organizationId = process.env.DEMO_ORG_ID || 'demo-org';
-    if (!process.env.DATABASE_URL) return NextResponse.json({ mode: 'demo', id: `mem-${Date.now()}`, status: 'persisted', outcome });
+    const organizationId = getRuntimeEnv('DEMO_ORG_ID') || 'demo-org';
+    if (!getRuntimeEnv('DATABASE_URL')) return NextResponse.json({ mode: 'demo', id: `mem-${Date.now()}`, status: 'persisted', outcome });
 
     const vector = await embed(`${assetId} ${summary} ${outcome}`);
     if (!vector) return NextResponse.json({ error: 'embedding service unavailable' }, { status: 503 });
