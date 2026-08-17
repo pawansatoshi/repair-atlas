@@ -1,108 +1,72 @@
 # RepairAtlas — Final Human Gate
 
-The repository and CI implementation are prepared. Human/cloud access is required only for the remaining external systems that ChatGPT's connected GitHub/Vercel tooling cannot provision for this submission.
+The repository and CI implementation are prepared. The remaining release decision is based only on observed cloud evidence.
 
-## Verified now
+## Verified
 
 - CockroachDB Cloud cluster connection verified manually.
 - RepairAtlas schema tables created in CockroachDB.
 - `repair_memories` uses `VECTOR(1024)`.
-- Vector index exists in the current database.
+- CockroachDB vector index is present and production retrieval is using cosine distance.
 - GitHub repository contains the application, schema, seed, agent, docs, QA gate, and AWS deployment configuration.
-- Typecheck passes in GitHub Actions.
-- Lint passes in GitHub Actions.
-- Smoke tests pass in GitHub Actions.
-- Production build passes in GitHub Actions.
-- Secrets are represented only as environment variables/examples.
+- Typecheck, lint, smoke tests, and production build have passed in the project quality gates.
+- AWS Amplify production deployment is live and manually exercised.
+- Amazon Bedrock embedding and reasoning are working in the deployed web application.
+- Real CockroachDB vector retrieval from the deployed application is working.
+- Real work-order and repair-outcome persistence from the deployed application is working.
+- The completed repair remains retrievable after refresh.
+- Final mobile/browser interaction audit of the deployed URL has been exercised.
 
 ## Still unverified
 
-- AWS Amplify production deployment.
-- Amazon Bedrock model access and real invocation.
-- Amazon Bedrock AgentCore runtime deployment/invocation.
-- Real CockroachDB vector retrieval from the deployed application.
-- Real outcome persistence from the deployed application.
-- Production runtime telemetry.
-- Final mobile/browser interaction audit on the deployed URL.
+- Independent Amazon Bedrock AgentCore runtime deployment/invocation evidence.
 - Final three-minute submission video.
 
 ## Human Gate 1 — CockroachDB migration
 
-The existing cluster already works, so do not recreate the database.
+The existing cluster already works. Do not recreate the database or run migrations again unless new evidence requires it.
 
-Run this once in CockroachDB SQL Shell:
-
-```sql
-DROP INDEX IF EXISTS repair_memories_embedding_idx;
-CREATE VECTOR INDEX IF NOT EXISTS repair_memories_embedding_idx
-ON repair_memories (organization_id, asset_id, embedding)
-USING COSINE;
-```
-
-Then verify:
-
-```sql
-SHOW INDEX FROM repair_memories;
-```
-
-The index named `repair_memories_embedding_idx` must be present.
+The production application has already demonstrated vector retrieval using the existing index. Preserve the current working database state.
 
 ## Human Gate 2 — AWS
 
-Create/connect an AWS Amplify Hosting application to this GitHub repository and deploy `main`.
+Production Amplify Hosting is connected to the GitHub repository and successfully deployed `main`.
 
-Configure server-side environment variables/secrets from `.env.example`:
+Server-side environment variables/secrets are configured through AWS. Never paste database passwords, AWS credentials, or runtime tokens into GitHub files, screenshots, or the video.
+
+## Human Gate 3 — Seed and memory integrity
+
+Production memory integrity has been exercised through the real product loop. Duplicate repair evidence was also found and the retrieval query now deduplicates identical title/summary/outcome records before ranking.
+
+Do not create additional duplicate repair events merely for testing.
+
+## Human Gate 4 — Real product loop — VERIFIED
+
+Observed on the deployed URL:
+
+1. Diagnosis for a PRESS-204 overheating incident.
+2. CockroachDB vector retrieval shown in the memory panel.
+3. Successful and failed interventions compared.
+4. Bedrock reasoning produced a bounded recommendation.
+5. Explicit human approval required before consequential write.
+6. Diagnostic work order persisted.
+7. Successful repair outcome recorded.
+8. Work order became `Completed`.
+9. Repair event and durable repair memory persisted.
+10. Diagnosis re-run successfully retrieved the persisted operational memory.
+11. Page refresh preserved the production retrieval flow and memory.
+
+Representative fresh query used during verification:
 
 ```text
-DATABASE_URL
-DATABASE_SSL=true
-DEMO_ORG_ID=demo-org
-AWS_REGION=us-east-1
-BEDROCK_MODEL_ID
-BEDROCK_EMBED_MODEL_ID=amazon.titan-embed-text-v2:0
-COCKROACH_MCP_URL=https://cockroachlabs.cloud/mcp
+PRESS-204 thermal rise during a long production cycle
 ```
 
-Never paste a database password or AWS secret into GitHub files, README, screenshots, or the video.
+The production UI showed CockroachDB vector retrieval, ranked memories, and cosine distances.
 
-## Human Gate 3 — Seed real memory
+## Human Gate 5 — Production smoke test — VERIFIED
 
-After AWS credentials and Bedrock access are configured, run the seed script from an authenticated development environment:
-
-```bash
-npm install
-npm run seed
-```
-
-Expected result:
-
-```text
-Seed complete: inserted=3 skipped=0 organization=demo-org
-```
-
-A second run should report the memories as skipped rather than creating duplicates.
-
-## Human Gate 4 — Real product loop
-
-On the deployed URL:
-
-1. Run diagnosis for `PRESS-204` overheating.
-2. Confirm the memory panel reports CockroachDB vector retrieval.
-3. Confirm the recommendation cites the successful/failed repair evidence.
-4. Approve the diagnostic work order.
-5. Confirm the work order is persisted.
-6. Record the successful repair outcome.
-7. Confirm the work order becomes completed.
-8. Confirm a repair event and repair memory are created.
-9. Run diagnosis again.
-10. Confirm the new/updated memory is retrievable.
-11. Refresh the page and confirm persistence remains.
-
-## Human Gate 5 — Production smoke test
-
-Open `/api/health` on the deployed application.
-
-For the full cloud release, the response must show:
+Production health evidence observed during the final verification session included:
 
 ```text
 status: ok
@@ -111,36 +75,57 @@ status: ok
  vectorMemory: true
  bedrock: true
  embeddings: true
+ repairMemoryCount: 5
+ embeddedMemoryCount: 5
+ embeddingCoverage: 1
+ mcp: true
+ embeddingProbe.ok: true
+ embeddingProbe.dimensions: 1024
 ```
 
-The MCP flag can be `true` when the MCP configuration is intentionally exposed to the application environment; the actual CockroachDB MCP authentication remains separately governed by the CockroachDB/AgentCore setup.
+The actual observed JSON is preserved in the engineering handoff and conversation evidence. The MCP flag indicates configured MCP reachability/configuration; it is not being used as proof of an independent AgentCore runtime invocation.
 
-## Human Gate 6 — AgentCore
+## Human Gate 6 — AgentCore — PENDING
 
-Deploy the bounded agent from `agentcore/repair_agent.py` using the current AWS AgentCore workflow documented in `agentcore/README.md`.
+The bounded agent is implemented in `agentcore/repair_agent.py` and the repository contains the current AgentCore CLI workflow.
 
-Then invoke the agent with the golden scenario and retain the actual invocation evidence for the submission demo.
+AWS documents the AgentCore CLI as the supported path for creating, deploying, checking status, and invoking AgentCore runtimes. citeturn995237search0
+
+Remaining action:
+
+```bash
+npm install -g @aws/agentcore
+agentcore status
+agentcore deploy --plan
+agentcore deploy
+agentcore status
+agentcore invoke --prompt "Diagnose PRESS-204 overheating after extended operation"
+```
+
+Retain the actual runtime deployment/status/invocation evidence for the submission. Do not claim AgentCore execution until the invocation has been observed.
 
 ## Human Gate 7 — Final evidence
 
 Capture only real evidence:
 
 - public AWS-hosted demo URL
-- CockroachDB table/vector evidence
+- CockroachDB/vector retrieval evidence
 - successful diagnosis
 - retrieved memory evidence
+- evidence-review panel
 - human approval
 - persisted work order
 - persisted repair outcome
+- completed work order
 - updated memory
-- AgentCore invocation
 - production health response
 - mobile browser interaction
+- AgentCore invocation, once independently verified
 
 ## Release rule
 
-If any of the cloud gates above are not verified, the final status remains:
+The **production web application is functionally verified**. Submission is fully complete only after the AgentCore runtime invocation evidence and final three-minute video are secured.
 
-**NOT READY**
+Until those two items are complete, final status remains:
 
-Do not submit a claim that AWS deployment, Bedrock, AgentCore, or production persistence works until it has actually been observed.
+**SUBMISSION-READY WEB LOOP — AGENTCORE/VIDEO GATE PENDING**
