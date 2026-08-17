@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from 'react';
 
-type Memory = { id:string; title:string; summary?:string; copy?:string; outcome:string; relevance?:number; score?:number; distance?:number };
+type Memory = { id:string; title:string; summary?:string; copy?:string; outcome:string; rank?:number; distance?:number };
 
 const demoMemories: Memory[] = [
-  {id:'mem-01',title:'Airflow restriction after extended runtime',summary:'Similar PRESS-204 incident. Intake obstruction was cleared and filter replaced; motor replacement was unnecessary.',outcome:'resolved',relevance:0.96},
-  {id:'mem-02',title:'Fan replacement did not resolve overheating',summary:'A prior attempt replaced the fan assembly without resolving the thermal symptom.',outcome:'failed',relevance:0.88},
-  {id:'mem-03',title:'Dust-loaded intake filter',summary:'Cleaning the intake path and replacing a saturated filter restored stable operating temperature.',outcome:'resolved',relevance:0.81},
+  {id:'mem-01',title:'Airflow restriction after extended runtime',summary:'Similar PRESS-204 incident. Intake obstruction was cleared and filter replaced; motor replacement was unnecessary.',outcome:'resolved',rank:1},
+  {id:'mem-02',title:'Fan replacement did not resolve overheating',summary:'A prior attempt replaced the fan assembly without resolving the thermal symptom.',outcome:'failed',rank:2},
+  {id:'mem-03',title:'Dust-loaded intake filter',summary:'Cleaning the intake path and replacing a saturated filter restored stable operating temperature.',outcome:'resolved',rank:3},
 ];
 
 const logs = [
@@ -100,7 +100,7 @@ export default function Home(){
               <input id="memory-search" className="search" value={query} onChange={e=>setQuery(e.target.value)} aria-describedby="search-help" placeholder="Example: PRESS-204 thermal rise during a long production cycle" />
               <div id="search-help" className="query-help">Edit this field, then tap <strong>Run diagnosis</strong> to retrieve semantically similar repairs.</div>
             </div>
-            <div className="memory-list">{filtered.length?filtered.map(m=><div className="memory" key={m.id}><strong>{m.title}</strong><p>{m.summary||m.copy}</p><div className="score">{m.outcome==='resolved'?'✓ Successful outcome':'× Failed intervention'}{typeof m.relevance==='number'?` · ${Math.round(m.relevance*100)}% relevance`:''}</div></div>):<div className="empty">No matching memories. Try a broader symptom.</div>}</div>
+            <div className="memory-list">{filtered.length?filtered.map(m=><div className="memory" key={m.id}><strong>{m.title}</strong><p>{m.summary||m.copy}</p><div className="score">{m.outcome==='resolved'?'✓ Successful outcome':'× Failed intervention'}{m.rank?` · Rank ${m.rank}`:''}{typeof m.distance==='number'?` · L2 distance ${m.distance.toFixed(3)}`:''}</div></div>):<div className="empty">No matching memories. Try a broader symptom.</div>}</div>
             <div className="footer-note">CockroachDB stores the operational record and vector memory together. No second vector database is required.</div>
           </aside>
         </section>
@@ -112,8 +112,8 @@ export default function Home(){
       <div className="card" style={{width:'min(760px,100%)',maxHeight:'85vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.45)'}} onClick={e=>e.stopPropagation()}>
         <div className="card-head"><div><div className="eyebrow">Evidence review</div><div className="card-title" style={{fontSize:20,marginTop:5}}>Why RepairAtlas recommends this action</div></div><button className="btn" onClick={()=>setEvidenceOpen(false)}>Close</button></div>
         <div style={{display:'grid',gap:12,marginTop:16}}>
-          <div className="memory" style={{borderColor:'rgba(116,215,176,.25)'}}><strong>1 · Retrieved memory</strong><p>{memories[0]?.title||'No top memory returned'}</p><div className="score">{memories[0]?.relevance!=null?`${Math.round(memories[0].relevance*100)}% relevance`:'Vector-ranked evidence'}</div></div>
-          <div className="memory"><strong>2 · Compared outcomes</strong><p>Successful airflow/filter interventions are preferred over the prior failed fan replacement.</p><div className="score">Success + failure evidence considered</div></div>
+          <div className="memory" style={{borderColor:'rgba(116,215,176,.25)'}}><strong>1 · Retrieved evidence</strong><p>Vector-ranked memories from CockroachDB, scoped to PRESS-204.</p><div style={{display:'grid',gap:8,marginTop:10}}>{memories.slice(0,3).map((memory,index)=><div key={memory.id} style={{padding:'9px 10px',borderRadius:10,background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.06)'}}><strong style={{fontSize:12}}>{index+1}. {memory.title}</strong><div className="muted" style={{fontSize:11,marginTop:3}}>{memory.outcome==='resolved'?'Successful intervention':'Failed intervention'}{typeof memory.distance==='number'?` · L2 distance ${memory.distance.toFixed(3)}`:''}</div></div>)}</div></div>
+          <div className="memory"><strong>2 · Compared outcomes</strong><p>Successful airflow/filter interventions are preferred over the prior failed fan replacement. Failed interventions are treated as negative evidence, not instructions to repeat the same action.</p><div className="score">Success + failure evidence considered</div></div>
           <div className="memory"><strong>3 · Agent reasoning</strong><p>{diagnosis}</p><div className="score">Bedrock reasoning + retrieved operational memory</div></div>
           <div className="memory"><strong>4 · Safety policy</strong><p>No consequential write is executed automatically. Creating the diagnostic work order requires explicit human approval.</p><div className="score">Human-in-the-loop boundary enforced</div></div>
         </div>
