@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { embed } from '@/lib/bedrock';
 import { getPool } from '@/lib/db';
 import { hasRuntimeEnv } from '@/lib/env';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const db = getPool();
   let database: 'connected' | 'not_configured' | 'unavailable' = db ? 'unavailable' : 'not_configured';
   let vectorMemory = false;
@@ -43,7 +44,7 @@ export async function GET() {
   const embeddings = hasRuntimeEnv('BEDROCK_EMBED_MODEL_ID');
   const embeddingCoverage = repairMemoryCount > 0 ? embeddedMemoryCount / repairMemoryCount : 0;
 
-  return NextResponse.json({
+  const result: Record<string, unknown> = {
     status: degraded ? 'degraded' : 'ok',
     database,
     databaseConfigured: hasRuntimeEnv('DATABASE_URL'),
@@ -57,5 +58,17 @@ export async function GET() {
     mcp: hasRuntimeEnv('COCKROACH_MCP_URL'),
     runtimeConfigSource: process.env.secrets ? 'amplify-secrets-or-env' : 'environment',
     timestamp: new Date().toISOString(),
-  }, { status: degraded ? 503 : 200, headers: { 'Cache-Control': 'no-store' } });
+  };
+
+  if (req.nextUrl.searchParams.get('probe') === 'embedding') {
+    try {
+      const vector = await embed('RepairAtlas production embedding smoke test');
+      result.embeddingProbe = { ok: Boolean(vector), dimensions: vector?.length || 0 };
+    } catch (error) {
+      result.embeddingProbe = { ok: false, dimensions: 0 };
+      console.error('embedding health probe failed', error instanceof Error ? error.message : 'unknown');
+    }
+  }
+
+  return NextResponse.json(result, { status: degraded ? 503 : 200, headers: { 'Cache-Control': 'no-store' } });
 }
