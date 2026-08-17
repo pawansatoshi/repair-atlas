@@ -26,8 +26,19 @@ export async function POST(req: NextRequest) {
     const hasDatabase = Boolean(getRuntimeEnv('DATABASE_URL'));
     let memories: MemoryRow[] = [];
     let retrievalMode: 'cockroachdb-vector' | 'cockroachdb-recent' | 'demo' = 'demo';
+    let embeddingAvailable = false;
 
-    const vector = await embed(`${assetId} ${symptom}`);
+    // Embedding is an enhancement to retrieval, not a reason to take the entire
+    // diagnostic workflow down. If Bedrock embedding invocation is unavailable,
+    // continue with the same CockroachDB records using recent retrieval.
+    let vector: number[] | undefined;
+    try {
+      vector = await embed(`${assetId} ${symptom}`);
+      embeddingAvailable = Boolean(vector?.length);
+    } catch (error) {
+      console.error('diagnosis embedding failed', error instanceof Error ? error.message : 'unknown');
+    }
+
     if (vector && hasDatabase) {
       const vectorLiteral = `[${vector.join(',')}]`;
       const result = await query<MemoryRow>(
@@ -63,11 +74,24 @@ export async function POST(req: NextRequest) {
       ? JSON.stringify(memories.map((memory) => ({ ...memory, distance: memory.distance })))
       : 'No matching historical records were found. Do not invent historical evidence.';
     const prompt = `You are RepairAtlas, a field-repair diagnostic assistant. Asset: ${assetId}. Current symptom: ${symptom}. Historical evidence: ${context}. Provide a concise recommendation grounded only in the supplied evidence. Clearly distinguish successful and failed interventions. Never invent measurements, parts, causes, or certainty. Do not authorize destructive or consequential actions. Recommendation:`;
-    const recommendation = await reason(prompt) || fallback;
+
+    // Reasoning is also best-effort: a transient/model-access problem should not
+    // hide the grounded evidence and safe deterministic recommendation.
+    let recommendation: string | undefined;
+    let reasoningAvailable = false;
+    try {
+      recommendation = await reason(prompt);
+      reasoningAvailable = Boolean(recommendation);
+    } catch (error) {
+      console.error('diagnosis reasoning failed', error instanceof Error ? error.message : 'unknown');
+    }
+    recommendation = recommendation || fallback;
 
     return NextResponse.json({
-      mode: getRuntimeEnv('BEDROCK_MODEL_ID') ? 'bedrock' : 'bounded-demo',
+      mode: reasoningAvailable ? 'bedrock' : 'bounded-demo',
       retrievalMode,
+      embeddingAvailable,
+      reasoningAvailable,
       assetId,
       recommendation,
       memories: memories.map((memory) => ({
