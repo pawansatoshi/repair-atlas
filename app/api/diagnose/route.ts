@@ -54,6 +54,38 @@ async function backfillMissingEmbeddings(organizationId: string, assetId: string
   return filled;
 }
 
+async function vectorMemories(organizationId: string, assetId: string, vector: number[]): Promise<MemoryRow[]> {
+  const vectorLiteral = `[${vector.join(',')}]`;
+
+  // Prefer the tenant/asset-scoped C-SPANN index. If the optimizer/index path
+  // rejects the filtered ANN query, fall back to an exact vector scan. The
+  // latter is still native CockroachDB vector similarity and is deterministic
+  // for the small memory set used by this application.
+  try {
+    const result = await query<MemoryRow>(
+      `SELECT id, title, summary, outcome, embedding <=> $1::VECTOR AS distance
+       FROM repair_memories
+       WHERE organization_id = $2 AND asset_id = $3 AND embedding IS NOT NULL
+       ORDER BY embedding <=> $1::VECTOR
+       LIMIT 5`,
+      [vectorLiteral, organizationId, assetId],
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('diagnosis vector index retrieval failed; retrying exact vector scan', error instanceof Error ? error.message : 'unknown');
+
+    const exact = await query<MemoryRow>(
+      `SELECT id, title, summary, outcome, embedding <=> $1::VECTOR AS distance
+       FROM repair_memories
+       WHERE organization_id = $2 AND asset_id = $3 AND embedding IS NOT NULL
+       ORDER BY (embedding <=> $1::VECTOR) ASC
+       LIMIT 5`,
+      [vectorLiteral, organizationId, assetId],
+    );
+    return exact.rows;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!req.headers.get('content-type')?.toLowerCase().includes('application/json')) {
@@ -78,22 +110,13 @@ export async function POST(req: NextRequest) {
       console.error('diagnosis embedding failed', error instanceof Error ? error.message : 'unknown');
     }
 
-    if (vector && hasDatabase) {
+    if (vector && vector.length === 1024 && hasDatabase) {
       backfilledEmbeddings = await backfillMissingEmbeddings(organizationId, assetId);
       try {
-        const vectorLiteral = `[${vector.join(',')}]`;
-        const result = await query<MemoryRow>(
-          `SELECT id, title, summary, outcome, embedding <=> $1::VECTOR AS distance
-           FROM repair_memories
-           WHERE organization_id = $2 AND asset_id = $3 AND embedding IS NOT NULL
-           ORDER BY embedding <=> $1::VECTOR
-           LIMIT 5`,
-          [vectorLiteral, organizationId, assetId],
-        );
-        memories = result.rows;
+        memories = await vectorMemories(organizationId, assetId, vector);
         if (memories.length) retrievalMode = 'cockroachdb-vector';
       } catch (error) {
-        console.error('diagnosis vector retrieval failed', error instanceof Error ? error.message : 'unknown');
+        console.error('diagnosis exact vector retrieval failed', error instanceof Error ? error.message : 'unknown');
       }
     }
 
