@@ -1,13 +1,15 @@
 import json
 import os
+
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
-import boto3
-import psycopg
 
 app = BedrockAgentCoreApp()
 
 
 def embed(text: str):
+    # Keep heavyweight/native dependencies out of process initialization.
+    import boto3
+
     client = boto3.client('bedrock-runtime', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
     response = client.invoke_model(
         modelId=os.environ.get('BEDROCK_EMBED_MODEL_ID', 'amazon.titan-embed-text-v2:0'),
@@ -26,6 +28,9 @@ def retrieve_memory(asset_id: str, symptom: str):
     db_url = os.environ.get('DATABASE_URL')
     if not db_url:
         return []
+
+    import psycopg
+
     vector = embed(f'{asset_id} {symptom}')
     with psycopg.connect(db_url, connect_timeout=5) as conn:
         with conn.cursor() as cur:
@@ -35,15 +40,28 @@ def retrieve_memory(asset_id: str, symptom: str):
                    WHERE organization_id=%s AND asset_id=%s AND embedding IS NOT NULL
                    ORDER BY embedding <=> %s::VECTOR
                    LIMIT 5""",
-                (json.dumps(vector), os.environ.get('DEMO_ORG_ID', 'demo-org'), asset_id, json.dumps(vector)),
+                (
+                    json.dumps(vector),
+                    os.environ.get('DEMO_ORG_ID', 'demo-org'),
+                    asset_id,
+                    json.dumps(vector),
+                ),
             )
             return [
-                {'id': r[0], 'title': r[1], 'summary': r[2], 'outcome': r[3], 'distance': float(r[4])}
+                {
+                    'id': r[0],
+                    'title': r[1],
+                    'summary': r[2],
+                    'outcome': r[3],
+                    'distance': float(r[4]),
+                }
                 for r in cur.fetchall()
             ]
 
 
 def model_reason(prompt: str):
+    import boto3
+
     client = boto3.client('bedrock-runtime', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
     response = client.converse(
         modelId=os.environ['BEDROCK_MODEL_ID'],
@@ -59,10 +77,21 @@ def handler(payload):
     symptom = str(payload.get('symptom', '')).strip()[:1000]
     if not asset_id or not symptom:
         return {'error': 'assetId and symptom are required'}
+
     memories = retrieve_memory(asset_id, symptom)
-    prompt = f"You are RepairAtlas. Asset: {asset_id}. Symptom: {symptom}. Historical evidence: {json.dumps(memories)}. Give a bounded diagnostic recommendation. Distinguish successful from failed interventions. Never invent measurements or authorize consequential writes."
+    prompt = (
+        f"You are RepairAtlas. Asset: {asset_id}. Symptom: {symptom}. "
+        f"Historical evidence: {json.dumps(memories)}. "
+        "Give a bounded diagnostic recommendation. Distinguish successful from failed interventions. "
+        "Never invent measurements or authorize consequential writes."
+    )
     recommendation = model_reason(prompt)
-    return {'assetId': asset_id, 'recommendation': recommendation, 'memoryCount': len(memories), 'retrieval': 'cockroachdb-vector'}
+    return {
+        'assetId': asset_id,
+        'recommendation': recommendation,
+        'memoryCount': len(memories),
+        'retrieval': 'cockroachdb-vector',
+    }
 
 
 if __name__ == '__main__':
