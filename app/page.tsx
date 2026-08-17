@@ -98,16 +98,21 @@ export default function Home(){
     finally{setBusy(false);}
   }
 
+  function showMemory(){
+    setTab('memory');
+    document.getElementById('memory')?.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
   return <div className="app">
     <header className="topbar"><div className="brand"><div className="mark">R</div><span>RepairAtlas</span></div><div className="status"><span className="dot"/>Memory system ready <span className="pill">{retrievalMode==='cockroachdb-vector'?'CockroachDB vector':'Bounded demo'}</span></div></header>
     <div className="shell">
       <aside className="sidebar" aria-label="Primary navigation">
         <div className="nav-title">Operations</div>
-        {['overview','work orders','memory','assets'].map(x=><button key={x} className={`nav-btn ${tab===x?'active':''}`} onClick={()=>setTab(x)} aria-current={tab===x?'page':undefined}><span aria-hidden="true">{x==='overview'?'◈':x==='work orders'?'□':x==='memory'?'◌':'◇'}</span><span>{x}</span></button>)}
+        {['overview','work orders','memory','assets'].map(x=><button key={x} className={`nav-btn ${tab===x?'active':''}`} onClick={()=>x==='memory'?showMemory():setTab(x)} aria-current={tab===x?'page':undefined}><span aria-hidden="true">{x==='overview'?'◈':x==='work orders'?'□':x==='memory'?'◌':'◇'}</span><span>{x}</span></button>)}
         <div className="nav-title">System</div><button className={`nav-btn ${tab==='health'?'active':''}`} onClick={()=>setTab('health')}><span aria-hidden="true">●</span><span>Health</span></button>
       </aside>
       <main className="main">
-        <section className="hero"><div><div className="eyebrow">Agentic field intelligence</div><h1>Every repair teaches the next one.</h1><p>RepairAtlas turns field experience into durable operational memory. The agent retrieves what worked before, explains why, and proposes the next safe action.</p></div><div className="hero-actions"><button className="btn" onClick={()=>document.getElementById('memory')?.scrollIntoView({behavior:'smooth'})}>View memory</button><button className="btn primary" onClick={()=>runDiagnosis()} disabled={busy}>{busy?'Reasoning…':'Run diagnosis'}</button></div></section>
+        <section className="hero"><div><div className="eyebrow">Agentic field intelligence</div><h1>Every repair teaches the next one.</h1><p>RepairAtlas turns field experience into durable operational memory. The agent retrieves what worked before, explains why, and proposes the next safe action.</p></div><div className="hero-actions"><button className="btn" onClick={showMemory}>View memory</button><button className="btn primary" onClick={()=>runDiagnosis()} disabled={busy}>{busy?'Reasoning…':'Run diagnosis'}</button></div></section>
         {message&&<div role="status" aria-live="polite" className="pill" style={{marginBottom:14,padding:'9px 12px'}}>{message}</div>}
         <section className="grid">
           <div className="card">
@@ -138,7 +143,7 @@ export default function Home(){
         <section className="card feature-panel"><div className="eyebrow">Why this is different</div><div className="feature-grid"><div><strong>Remember outcomes</strong><p className="muted">The agent learns from successful and failed interventions, not just conversation history.</p></div><div><strong>Act safely</strong><p className="muted">Reads can be automated; consequential writes stay behind explicit approval.</p></div><div><strong>Keep memory close to truth</strong><p className="muted">Transactional state and semantic experiences live in the same CockroachDB system of record.</p></div></div></section>
       </main>
     </div>
-    <nav className="mobile-nav" aria-label="Mobile navigation">{['overview','work orders','memory','assets'].map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)} aria-current={tab===x?'page':undefined}>{x}</button>)}</nav>
+    <nav className="mobile-nav" aria-label="Mobile navigation">{['overview','work orders','memory','assets'].map(x=><button key={x} className={tab===x?'active':''} onClick={()=>x==='memory'?showMemory():setTab(x)} aria-current={tab===x?'page':undefined}>{x}</button>)}</nav>
     {evidenceOpen&&<div role="dialog" aria-modal="true" aria-label="Diagnostic evidence" style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(3,8,12,.78)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setEvidenceOpen(false)}>
       <div className="card" style={{width:'min(760px,100%)',maxHeight:'85vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.45)'}} onClick={e=>e.stopPropagation()}>
         <div className="card-head"><div><div className="eyebrow">Evidence review</div><div className="card-title" style={{fontSize:20,marginTop:5}}>Why RepairAtlas recommends this action</div></div><button className="btn" onClick={()=>setEvidenceOpen(false)}>Close</button></div>
