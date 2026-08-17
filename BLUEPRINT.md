@@ -1,6 +1,6 @@
-# RepairAtlas — Master Blueprint
+# RepairAtlas — Product and Architecture Blueprint
 
-> **Implementation status snapshot — 2026-08-16:** The Bedrock → Lambda/API → CockroachDB embedding/persistence slice is verified for the tested repair memory, including 1024-dimensional storage, semantic retrieval, UUID validation, required-field validation, and safe nonexistent-memory handling. The complete agentic memory loop is **not yet verified**. Read `docs/HANDOFF_PROGRESS_2026-08-16.md` before continuing implementation.
+> **Implementation status snapshot — 2026-08-16:** The Bedrock → Lambda/API → CockroachDB embedding/persistence slice is verified for the tested repair memory, including 1,024-dimensional storage, semantic retrieval, UUID validation, required-field validation, and safe nonexistent-memory handling. The complete agentic memory loop is **not yet verified**. Read `docs/HANDOFF_PROGRESS_2026-08-16.md` before continuing implementation.
 
 ## 1. Product thesis
 
@@ -8,25 +8,17 @@
 
 The product is not a chatbot with chat history. It is an operational agent that combines current asset state, historical repair experiences, semantic retrieval, controlled actions, and outcome learning.
 
-## 2. Winning equation
+## 2. Design principles
 
-```text
-Real field-service problem
-        +
-Agent genuinely required
-        +
-Persistent experience memory genuinely required
-        +
-CockroachDB as system of record + vector memory
-        +
-AWS as real execution infrastructure
-        +
-Safe, observable actions
-        +
-A memorable before/after demo
-        =
-Strong hackathon submission
-```
+RepairAtlas is designed around these principles:
+
+- solve a real field-service problem rather than a generic chat use case
+- use an agent where retrieval, comparison, policy, and workflow action provide real value
+- make persistent repair experience a first-class data model
+- keep CockroachDB as the transactional system of record and vector-memory store
+- tie AWS services to concrete runtime responsibilities
+- keep consequential actions observable and approval-gated
+- prefer a small evidence set and explainable recommendations over opaque automation
 
 ## 3. Target user
 
@@ -182,11 +174,11 @@ agent reasoning
 
 Do not introduce Pinecone, Weaviate, Qdrant, Chroma, or another vector database unless a future requirement proves CockroachDB insufficient.
 
-**Verified implementation slice:** `repair_memories.embedding` is `VECTOR(1024)`, Titan Text Embeddings V2 returns 1024 dimensions, a real memory has been persisted, and CockroachDB vector-distance retrieval returns the expected repair memory.
+**Verified implementation slice:** `repair_memories.embedding` is `VECTOR(1024)`, Titan Text Embeddings V2 returns 1,024 dimensions, a real memory has been persisted, and CockroachDB vector-distance retrieval returns the expected repair memory.
 
 ## 10. Outcome-aware memory
 
-A critical differentiator is remembering both successful and unsuccessful attempts.
+A critical product property is remembering both successful and unsuccessful attempts.
 
 Example:
 
@@ -208,13 +200,13 @@ Model inference and reasoning.
 
 ### Amazon Bedrock AgentCore Runtime
 
-Production agent execution, session isolation, authentication/authorization integration, observability, and runtime scaling.
+Target runtime for bounded agent execution, session isolation, authorization integration, observability, and runtime scaling.
 
 ### Amazon S3
 
-Service manuals, equipment documentation, maintenance artifacts, and generated reports.
+Target location for service manuals, equipment documentation, maintenance artifacts, and generated reports when document retrieval is implemented.
 
-The architecture should not use AWS as a compliance checkbox. Each AWS component has a visible job in the execution path.
+The architecture should not use AWS as a checkbox. Each AWS component should have a concrete job in the execution path.
 
 **Current verified path:** API Gateway → Lambda (`repair-atlas-bedrock`) → Amazon Bedrock Titan Text Embeddings V2 → CockroachDB. AgentCore Runtime and S3 are target architecture components and are not marked verified until directly exercised.
 
@@ -226,11 +218,11 @@ Provides semantic retrieval over repair experiences.
 
 ### Capability 2 — Managed MCP Server
 
-Provides a governed MCP interface for agent/database interaction.
+Provides a governed MCP interface for agent/database interaction when configured and authorized.
 
 The agent should have narrowly scoped permissions and should not receive unrestricted administrative access.
 
-**Current verification:** CockroachDB persistence and vector retrieval are proven for the tested repair-memory path. Managed MCP integration remains open.
+**Current verification:** CockroachDB persistence and vector retrieval are proven for the tested repair-memory path. Managed MCP integration remains open for independent end-to-end verification.
 
 ## 13. Security model
 
@@ -334,7 +326,7 @@ Hard-coded demo results do not count.
 - [x] database connection works for the verified Lambda path
 - [x] vector retrieval works for the tested repair-memory path
 - [ ] agent works end-to-end
-- [ ] MCP path works
+- [ ] MCP path works end-to-end
 - [x] memory persists for the tested record
 - [ ] memory updates after outcome in the complete workflow
 - [x] AWS execution works for the verified embedding path
@@ -368,9 +360,9 @@ Hard-coded demo results do not count.
 - [ ] idempotent writes where appropriate
 - [ ] graceful degradation
 
-## 18. Non-goals for the hackathon
+## 18. Current MVP non-goals
 
-Do not add complexity that does not improve judging evidence:
+Avoid adding complexity that does not improve the core repair-memory workflow:
 
 - hardware integration
 - voice interface
@@ -381,7 +373,7 @@ Do not add complexity that does not improve judging evidence:
 - second vector database
 - unnecessary analytics suite
 
-## 19. Product evolution after the hackathon
+## 19. Product evolution
 
 ```text
 MVP
@@ -399,4 +391,4 @@ Technician knowledge transfer
 Enterprise field-service platform
 ```
 
-The hackathon submission remains intentionally narrow while the product architecture stays extensible.
+The initial product remains intentionally narrow while the architecture stays extensible.
