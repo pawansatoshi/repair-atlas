@@ -2,60 +2,54 @@
 
 > **Every repair teaches the next one.**
 
-RepairAtlas is an agentic field-operations console that turns completed repairs into durable institutional memory. It retrieves prior experiences, distinguishes successful from failed interventions, proposes a bounded next step, keeps consequential writes behind human approval, and persists the outcome so the next incident can benefit from it.
+RepairAtlas is an agentic field-operations console that turns completed repairs into durable operational memory. It retrieves prior repair experiences, distinguishes successful from failed interventions, proposes a bounded next step, keeps consequential writes behind explicit human approval, and persists the outcome so future incidents can use the evidence.
 
-Built for the **CockroachDB × AWS Hackathon — Build with Agentic Memory**.
-
-## Why this can win
-
-RepairAtlas treats memory as operational infrastructure, not chat history:
+## Core loop
 
 ```text
-Current failure
+current incident
       ↓
-Asset context
+asset context
       ↓
-CockroachDB vector memory
+semantic repair-memory retrieval
       ↓
-Outcome-aware Bedrock reasoning
+compare successful and failed outcomes
       ↓
-Human approval boundary
+bounded recommendation
       ↓
-Work order / repair action
+human approval
       ↓
-Technician outcome
+work-order action
       ↓
-Audited repair event
+repair outcome
       ↓
-Durable vector memory
+durable repair memory
       ↓
-Future incident
+future incident
 ```
 
-The same CockroachDB system of record holds transactional state, repair events, audit events, and semantic memory. That makes the memory loop demonstrable rather than a mock UI.
+The key design choice is that repair memory is part of the operational system of record rather than a separate chat-history feature. Transactional state, repair events, audit events, and semantic memory live in CockroachDB.
 
-## Hackathon architecture
+## Architecture
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| Product UI + APIs | Next.js 15 + React 19 | Responsive operations console and server APIs |
-| Agent reasoning | Amazon Bedrock | Bounded diagnostic recommendation |
-| Agent runtime | Amazon Bedrock AgentCore Runtime | AWS-hosted bounded agent runtime (runtime deployment/invocation remains the final external gate) |
-| System of record | CockroachDB Cloud | Transactional operational state + durable memory |
+| Product UI + APIs | Next.js 15 + React 19 | Responsive field-operations console and server APIs |
+| Reasoning + embeddings | Amazon Bedrock | Bounded diagnostic reasoning and 1,024-dimensional embeddings |
+| Agent runtime | Amazon Bedrock AgentCore Runtime | Bounded agent runtime; independent deployed invocation remains a release verification item |
+| System of record | CockroachDB Cloud | Transactional operational state and durable repair memory |
 | Semantic memory | CockroachDB Distributed Vector Indexing | Similarity retrieval without a second vector database |
-| Agent/database interface | CockroachDB Managed MCP Server | Governed AI access to CockroachDB |
-| Hosting | AWS Amplify Hosting | AWS-hosted Next.js application |
+| Agent/database interface | CockroachDB Managed MCP Server | Governed database access when configured |
+| Hosting | AWS Amplify Hosting | Production Next.js hosting |
 
-The project deliberately uses two CockroachDB capabilities required by the challenge: the Managed MCP Server and Distributed Vector Indexing. The application also uses CockroachDB as the transactional source of truth for work orders, repair events, agent actions, audit events, and memories.
-
-Amazon Titan Text Embeddings V2 produces 1,024-dimensional vectors, matching `VECTOR(1024)` in the schema. Similarity computation and retrieval remain in CockroachDB.
+Amazon Titan Text Embeddings V2 produces 1,024-dimensional vectors, matching `VECTOR(1024)` in the database schema. Similarity retrieval remains in CockroachDB.
 
 ## Golden scenario
 
 **Asset:** `PRESS-204`  
 **Symptom:** overheating after extended operation.
 
-The agent retrieves relevant experiences including a successful airflow/filter intervention and a failed fan replacement. It recommends checking airflow before replacing the motor, explains the evidence, and requires explicit approval before creating a diagnostic work order. The technician outcome becomes a repair event and durable memory, closing the learning loop.
+RepairAtlas retrieves related experiences, including successful airflow/filter interventions and a failed fan replacement. The reasoning path favors inspecting airflow before replacing the motor, explains the supporting evidence, and requires explicit approval before creating a diagnostic work order. The recorded repair outcome then becomes durable memory.
 
 ## Run locally
 
@@ -64,7 +58,7 @@ Requirements:
 - Node.js 20+
 - npm
 - Optional: CockroachDB Cloud
-- Optional: AWS Bedrock access
+- Optional: Amazon Bedrock access
 
 ```bash
 npm install
@@ -74,90 +68,71 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-Without cloud credentials the UI runs in **bounded demo mode**. It never claims that live database or Bedrock calls occurred when they did not.
+Without cloud credentials, the UI runs in bounded demo mode. It does not claim that live database or Bedrock calls occurred when they did not.
 
 ## CockroachDB setup
 
 Run `database/schema.sql` against the dedicated application database using a least-privilege SQL role.
 
-Production path:
+Production data path:
 
 - CockroachDB transactional state
-- CockroachDB `VECTOR(1024)` memory
+- CockroachDB `VECTOR(1024)` repair memory
 - Distributed vector index
-- CockroachDB Managed MCP Server
-- organization/asset scoping
+- organization and asset scoping
 - explicit approval for consequential writes
 - append-oriented repair and audit history
 
-The MCP configuration example is in `.mcp.json.example`. Use the exact authentication snippet generated by CockroachDB Cloud Console and never commit a credential.
+The MCP configuration example is in `.mcp.json.example`. Use the exact authentication configuration generated by CockroachDB Cloud and never commit credentials.
 
-## AWS deployment path
+## AWS deployment
 
-The hackathon requires the project to be deployed on AWS and to use at least one AWS service. The repository contains an AWS Amplify Hosting build specification for the Next.js application and an Amazon Bedrock AgentCore runtime implementation.
+The repository contains AWS Amplify Hosting configuration for the Next.js application and an AgentCore runtime implementation.
 
-For the AWS deployment, connect this GitHub repository to Amplify Hosting, configure the server-side environment variables/secrets, deploy the branch, then deploy and verify the AgentCore runtime. AWS documents Git-connected Next.js deployment and environment-variable configuration in Amplify.
+For production deployment, connect the repository to Amplify Hosting and configure server-side environment variables/secrets through AWS. If AgentCore is retained in the deployment architecture, deploy and independently invoke the runtime before describing it as runtime-verified.
 
-Required runtime configuration includes:
-
-```text
-DATABASE_URL=
-DATABASE_SSL=true
-DEMO_ORG_ID=demo-org
-AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=
-BEDROCK_EMBED_MODEL_ID=amazon.titan-embed-text-v2:0
-COCKROACH_MCP_URL=https://cockroachlabs.cloud/mcp
-```
-
-Do not place secrets in source control. Use the AWS deployment console/secret mechanism for sensitive values.
+Sensitive values must remain in the AWS deployment/secret mechanism and outside source control.
 
 ## AgentCore
 
-The bounded agent is in `agentcore/repair_agent.py`. It embeds the incident with Bedrock, retrieves asset-scoped vector memory from CockroachDB, and asks Bedrock for a bounded recommendation. The current AWS AgentCore CLI workflow is documented in `agentcore/README.md`.
+The bounded agent implementation is in `agentcore/repair_agent.py`. It embeds the incident with Bedrock, retrieves asset-scoped repair memory from CockroachDB, and requests a bounded recommendation from Bedrock.
 
-Current release state: the **web application’s live production Bedrock/vector loop is verified**; an independent deployed AgentCore runtime invocation is the remaining external verification gate.
+The current release evidence verifies the deployed web application's Bedrock/vector reasoning path. An independent deployed AgentCore runtime invocation remains a separate verification item.
 
 ## API surface
 
 - `GET /api/health` — database/schema/vector/Bedrock/MCP readiness.
 - `POST /api/memories` — scoped semantic retrieval endpoint.
-- `POST /api/diagnose` — asset-scoped memory retrieval + bounded reasoning.
+- `POST /api/diagnose` — asset-scoped memory retrieval and bounded reasoning.
 - `POST /api/work-orders` — approval-gated, audited work-order creation.
-- `POST /api/outcomes` — audited repair event + durable memory persistence.
+- `POST /api/outcomes` — audited repair event and durable memory persistence.
 - `GET /api/mcp` — managed MCP configuration/reachability check when credentials are configured.
 
-All write APIs validate input server-side, enforce organization/asset boundaries, use safe error responses, and avoid exposing stack traces or credentials.
+Write APIs validate input server-side, enforce organization/asset boundaries, use safe error responses, and avoid exposing stack traces or credentials.
 
-## Product quality standard
+## Quality and security
 
-This repository follows:
+The repository maintains explicit engineering and release gates in:
 
-- `PROJECT_ZERO_BUG_DELIVERY_PROTOCOL.md`
 - `QA_RELEASE_GATE.md`
-- `templates/WEBSITE_PRODUCTION_BUILD_PROMPT.md`
-- `templates/DESIGN_SYSTEM_TEMPLATE.md`
-- `templates/UX_SPEC_TEMPLATE.md`
-- `templates/I18N_SPEC_TEMPLATE.md`
-- `templates/SECURITY_SPEC_TEMPLATE.md`
-- `templates/PERFORMANCE_SPEC_TEMPLATE.md`
+- `PROJECT_ZERO_BUG_DELIVERY_PROTOCOL.md`
+- `RELEASE_READINESS.md`
+- `SECURITY.md`
 
-The UI is designed for mobile, tablet, laptop and desktop without browser desktop mode. It includes semantic structure, visible keyboard focus, reduced-motion support, touch-friendly mobile navigation, loading/error/empty states, and bounded approval UX.
+The UI is designed for mobile, tablet, laptop, and desktop use. It includes visible keyboard focus, reduced-motion support, touch-friendly navigation, loading/error/empty states, and an approval boundary for consequential actions.
 
-## Security principles
+Security principles include:
 
-- No secrets in source control.
-- No client-trusted organization authorization.
-- Consequential agent writes require explicit approval.
-- Asset IDs are validated against the server-side organization.
-- Repair outcomes are linked to repair events and work orders.
-- Agent actions and consequential writes are audited.
-- External model output is treated as untrusted input.
-- Errors do not expose stack traces or credentials.
+- no secrets in source control
+- server-side organization and asset authorization
+- explicit approval for consequential agent writes
+- validation of external model output
+- audited consequential actions
+- safe error handling without stack traces or credentials
 
-## Verified production evidence
+## Verified production behavior
 
-The live AWS Amplify deployment has been manually exercised on mobile and verified to:
+The live AWS Amplify deployment has been manually exercised and verified to:
 
 - load the production application
 - report the memory system as ready
@@ -172,23 +147,19 @@ The live AWS Amplify deployment has been manually exercised on mobile and verifi
 - retrieve the memory again after refresh
 - expose a read-only evidence review explaining retrieval, comparison, reasoning, and policy
 
-A production health probe also returned `status: ok`, database connectivity, ready tables, vector memory, Bedrock, embeddings, MCP, full embedding coverage, and `embeddingProbe.ok=true` with `dimensions=1024` during the final verification session.
+A production health probe also returned successful database connectivity, ready tables, vector memory, Bedrock, embeddings, and MCP readiness during the latest verification session. The observed embedding probe reported `dimensions=1024`.
 
-## Demo discipline
+These statements describe observed behavior from the current verification session; they are not a claim that the system is bug-free or production-complete in every environment.
 
-The final hackathon demo must show **real persistence and the real memory loop**. Hard-coded results are only fallback/demo evidence and are explicitly labeled. The submission video should show the real production flow and evidence rather than relying on screenshots alone.
+## Challenge context
 
-## Hackathon submission checklist
+RepairAtlas was developed for the CockroachDB × AWS agentic-memory challenge. The implementation keeps the challenge-relevant technologies tied to concrete product responsibilities rather than adding services only for demonstration value.
 
-The submission should include the public repository, functional AWS-hosted demo URL, English description/testing instructions, public video under three minutes, identification of CockroachDB and AWS tools used, and the deployed AWS application.
+## Current release status
 
-Submission deadline recorded in project materials: **August 18, 2026 at 5:00 PM EDT**.
+**Verified:** deployed web application, CockroachDB persistence and vector retrieval, Bedrock reasoning, approval-gated work-order flow, repair-outcome persistence, durable memory persistence, refresh persistence, and mobile interaction.
 
-## Final release status
-
-**PASS — verified production web loop:** database, vector retrieval, Bedrock reasoning, human approval, work-order persistence, outcome persistence, memory persistence, refresh persistence, and mobile interaction.  
-**PENDING — external AgentCore gate:** independent AWS AgentCore runtime deployment/invocation evidence.  
-**SUBMISSION READINESS:** ready for final AgentCore verification; do not claim AgentCore runtime execution until it is actually observed.
+**Pending:** independent AgentCore runtime deployment/invocation evidence and final release/security review after any remaining changes.
 
 ## License
 
