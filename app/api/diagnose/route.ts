@@ -57,33 +57,24 @@ async function backfillMissingEmbeddings(organizationId: string, assetId: string
 async function vectorMemories(organizationId: string, assetId: string, vector: number[]): Promise<MemoryRow[]> {
   const vectorLiteral = `[${vector.join(',')}]`;
 
-  // Prefer the tenant/asset-scoped C-SPANN index. If the optimizer/index path
-  // rejects the filtered ANN query, fall back to an exact vector scan. The
-  // latter is still native CockroachDB vector similarity and is deterministic
-  // for the small memory set used by this application.
-  try {
-    const result = await query<MemoryRow>(
-      `SELECT id, title, summary, outcome, embedding <=> $1::VECTOR AS distance
+  // CockroachDB's current vector-index documentation centers the indexed
+  // ANN path on L2 (<->) search with equality filters on prefix columns.
+  // Use the same shape for the production query; with only a few memories
+  // this is also a deterministic exact KNN scan if the index is not used.
+  const result = await query<MemoryRow>(
+    `WITH scoped_memories AS (
+       SELECT id, title, summary, outcome, embedding
        FROM repair_memories
        WHERE organization_id = $2 AND asset_id = $3 AND embedding IS NOT NULL
-       ORDER BY embedding <=> $1::VECTOR
-       LIMIT 5`,
-      [vectorLiteral, organizationId, assetId],
-    );
-    return result.rows;
-  } catch (error) {
-    console.error('diagnosis vector index retrieval failed; retrying exact vector scan', error instanceof Error ? error.message : 'unknown');
-
-    const exact = await query<MemoryRow>(
-      `SELECT id, title, summary, outcome, embedding <=> $1::VECTOR AS distance
-       FROM repair_memories
-       WHERE organization_id = $2 AND asset_id = $3 AND embedding IS NOT NULL
-       ORDER BY (embedding <=> $1::VECTOR) ASC
-       LIMIT 5`,
-      [vectorLiteral, organizationId, assetId],
-    );
-    return exact.rows;
-  }
+     )
+     SELECT id, title, summary, outcome,
+            embedding <-> $1::VECTOR AS distance
+     FROM scoped_memories
+     ORDER BY distance ASC
+     LIMIT 5`,
+    [vectorLiteral, organizationId, assetId],
+  );
+  return result.rows;
 }
 
 export async function POST(req: NextRequest) {
@@ -116,7 +107,7 @@ export async function POST(req: NextRequest) {
         memories = await vectorMemories(organizationId, assetId, vector);
         if (memories.length) retrievalMode = 'cockroachdb-vector';
       } catch (error) {
-        console.error('diagnosis exact vector retrieval failed', error instanceof Error ? error.message : 'unknown');
+        console.error('diagnosis vector retrieval failed', error instanceof Error ? error.message : 'unknown');
       }
     }
 
@@ -156,6 +147,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       mode: reasoningAvailable ? 'bedrock' : 'bounded-demo',
       retrievalMode,
+      vectorMetric: 'l2',
       embeddingAvailable,
       backfilledEmbeddings,
       reasoningAvailable,
@@ -163,7 +155,7 @@ export async function POST(req: NextRequest) {
       recommendation,
       memories: memories.map((memory) => ({
         ...memory,
-        relevance: typeof memory.distance === 'number' ? Math.max(0, 1 - Number(memory.distance)) : undefined,
+        relevance: typeof memory.distance === 'number' ? 1 / (1 + Number(memory.distance)) : undefined,
       })),
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
