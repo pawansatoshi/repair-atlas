@@ -25,11 +25,10 @@ A model could attempt a destructive or unauthorized operation.
 
 Controls:
 
-- explicit tool allowlist
-- role-based authorization
-- forbidden operation list
+- explicit action boundary
+- constrained database access
 - human approval gates
-- no administrative SQL tool
+- no administrative SQL tool exposed to the model
 
 ### Credential exposure
 
@@ -39,21 +38,20 @@ Controls:
 
 - environment/managed secret configuration
 - `.env` ignored by Git
-- secret scanning
+- secret scanning checks in the release smoke test
 - no credentials in logs
-- least-privilege IAM
+- least-privilege AWS/database configuration
 
-### Cross-session contamination
+### Cross-session / tenant contamination
 
-One user's operational context must not appear in another user's session.
+The current hackathon deployment uses a server-configured organization scope (`DEMO_ORG_ID`) and asset-scoped queries. It does **not** implement end-user authentication or a multi-user identity provider yet. Production multi-tenant identity and authorization therefore remain a hardening item rather than a claimed completed control.
 
-Controls:
+Controls currently present:
 
-- explicit organization/site/asset scope
-- authorization before retrieval
-- session identifiers
-- AgentCore Runtime session isolation where applicable
-- database-level access controls
+- server-side organization scope
+- asset scope on memory and operational queries
+- database foreign-key relationships
+- no client-provided organization identifier
 
 ### SQL injection
 
@@ -64,7 +62,6 @@ Controls:
 - parameterized queries
 - typed validation
 - no model-generated unrestricted SQL
-- constrained database tools
 
 ### Data integrity
 
@@ -73,40 +70,37 @@ A repair outcome must not leave the operational state and memory state in an amb
 Controls:
 
 - transactional writes where appropriate
-- idempotency keys for retryable actions
+- duplicate open/staged work-order reuse
 - audit events
 - explicit failure states
+- repair-memory provenance through `source_event_id`
 
-## Agent permission matrix
+## Agent permission boundary
 
-| Capability | Policy |
+| Capability | Current policy |
 |---|---|
-| Read asset | Allowed when authorized |
-| Read repair history | Allowed when authorized |
-| Semantic memory search | Allowed when authorized |
-| Read service documentation | Allowed when authorized |
+| Read asset-scoped repair memory | Allowed within configured organization scope |
+| Semantic memory search | Allowed within configured organization/asset scope |
 | Draft diagnosis | Allowed |
-| Create work order | Approval required |
-| Change operational state | Approval required |
-| Record technician outcome | Authorized write |
-| Create memory | Authorized system action |
-| Delete repair history | Forbidden |
-| Alter audit history | Forbidden |
-| Modify schema | Forbidden |
-| Read credentials | Forbidden |
+| Create work order | Explicit approval required |
+| Record technician outcome | Application write path |
+| Create repair memory | Application write path after an outcome |
+| Delete repair history | No application endpoint |
+| Alter audit history | No application endpoint |
+| Modify schema | No application endpoint |
+| Read credentials | Not exposed to the model |
 
 ## Logging
 
 Log operational metadata needed for debugging and auditability:
 
 - timestamp
-- session identifier
-- user/organization scope
+- session identifier where available
+- organization scope
 - asset identifier
-- tool name
 - action class
 - success/failure
-- latency
+- latency where available
 - safe error code
 
 Never log:
@@ -130,4 +124,4 @@ If a credential is exposed:
 
 ## Production hardening roadmap
 
-The hackathon MVP focuses on strong least-privilege boundaries. Future production work should include formal threat modeling, penetration testing, stronger tenant isolation, compliance requirements, key management, retention policies, and security monitoring.
+The hackathon MVP focuses on bounded agent actions, scoped database access, explicit approval, and secret hygiene. Before treating the application as a general multi-tenant production system, add formal end-user authentication/authorization, stronger tenant isolation, penetration testing, compliance requirements, key management, retention policies, and security monitoring.
