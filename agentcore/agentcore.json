@@ -1,0 +1,26 @@
+{
+  "name": "RepairAtlas",
+  "version": 1,
+  "tags": {
+    "agentcore:created-by": "agentcore-cli",
+    "agentcore:project-name": "RepairAtlas"
+  },
+  "runtimes": [
+    {
+      "name": "RepairAtlas",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": "app/RepairAtlas/",
+      "runtimeVersion": "PYTHON_3_14",
+      "networkMode": "PUBLIC",
+      "protocol": "HTTP"
+    }
+  ],
+  "memories": [],
+  "credentials": [],
+  "payments": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [],
+  "policyEngines": []
+}
