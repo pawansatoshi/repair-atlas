@@ -81,7 +81,7 @@ async function vectorMemories(organizationId: string, assetId: string, vector: n
        WHERE duplicate_rank = 1
      )
      SELECT id, title, summary, outcome,
-            embedding <-> $1::VECTOR AS distance
+            embedding <=> $1::VECTOR AS distance
      FROM unique_memories
      ORDER BY distance ASC
      LIMIT 5`,
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       mode: reasoningAvailable ? 'bedrock' : 'bounded-demo',
       retrievalMode,
-      vectorMetric: 'l2',
+      vectorMetric: 'cosine',
       embeddingAvailable,
       backfilledEmbeddings,
       reasoningAvailable,
