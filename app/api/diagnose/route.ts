@@ -15,10 +15,19 @@ type MemoryRow = { id: string; title: string; summary: string; outcome: string; 
 
 async function recentMemories(organizationId: string, assetId: string): Promise<MemoryRow[]> {
   const result = await query<MemoryRow>(
-    `SELECT id, title, summary, outcome
-     FROM repair_memories
-     WHERE organization_id = $1 AND asset_id = $2
-     ORDER BY created_at DESC
+    `WITH deduped AS (
+       SELECT id, title, summary, outcome,
+              ROW_NUMBER() OVER (
+                PARTITION BY title, summary, outcome
+                ORDER BY created_at DESC, id DESC
+              ) AS duplicate_rank
+       FROM repair_memories
+       WHERE organization_id = $1 AND asset_id = $2
+     )
+     SELECT id, title, summary, outcome
+     FROM deduped
+     WHERE duplicate_rank = 1
+     ORDER BY id DESC
      LIMIT 5`,
     [organizationId, assetId],
   );
@@ -58,13 +67,22 @@ async function vectorMemories(organizationId: string, assetId: string, vector: n
   const vectorLiteral = `[${vector.join(',')}]`;
   const result = await query<MemoryRow>(
     `WITH scoped_memories AS (
-       SELECT id, title, summary, outcome, embedding
+       SELECT id, title, summary, outcome, embedding, created_at,
+              ROW_NUMBER() OVER (
+                PARTITION BY title, summary, outcome
+                ORDER BY created_at DESC, id DESC
+              ) AS duplicate_rank
        FROM repair_memories
        WHERE organization_id = $2 AND asset_id = $3 AND embedding IS NOT NULL
+     ),
+     unique_memories AS (
+       SELECT id, title, summary, outcome, embedding
+       FROM scoped_memories
+       WHERE duplicate_rank = 1
      )
      SELECT id, title, summary, outcome,
             embedding <-> $1::VECTOR AS distance
-     FROM scoped_memories
+     FROM unique_memories
      ORDER BY distance ASC
      LIMIT 5`,
     [vectorLiteral, organizationId, assetId],
