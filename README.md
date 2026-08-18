@@ -4,6 +4,18 @@
 
 RepairAtlas is an agentic field-operations console that turns completed repairs into durable operational memory. It retrieves prior repair experiences, distinguishes successful from failed interventions, proposes a bounded next step, keeps consequential writes behind explicit human approval, and persists the outcome so future incidents can use the evidence.
 
+## Judge quick start
+
+**Live product:** use the deployed application and run the `PRESS-204` overheating scenario.
+
+**Interactive architecture + engineering story:** open [`/architecture`](./app/architecture/page.tsx) in the deployed app. It explains the system in plain language, lets reviewers click through the architecture, shows the memory loop, documents real debugging findings, and includes a judge FAQ.
+
+**Engineering evidence:** [`docs/DEVELOPMENT_LOG.md`](./docs/DEVELOPMENT_LOG.md) records the debugging journey, AWS findings, verification status, and the distinction between verified and pending capabilities.
+
+**Detailed architecture:** [`docs/architecture.md`](./docs/architecture.md)
+
+**Release gate:** [`QA_RELEASE_GATE.md`](./QA_RELEASE_GATE.md)
+
 ## Core loop
 
 ```text
@@ -50,6 +62,44 @@ Amazon Titan Text Embeddings V2 produces 1,024-dimensional vectors, matching `VE
 **Symptom:** overheating after extended operation.
 
 RepairAtlas retrieves related experiences, including successful airflow/filter interventions and a failed fan replacement. The reasoning path favors inspecting airflow before replacing the motor, explains the supporting evidence, and requires explicit approval before creating a diagnostic work order. The recorded repair outcome then becomes durable memory.
+
+## What a factory user actually does
+
+1. **Describe the problem:** `PRESS-204 overheating after 6 hours of production.`
+2. **Run diagnosis:** the system retrieves semantically similar repair experiences.
+3. **Read the evidence:** successful and failed interventions are shown separately.
+4. **Review the recommendation:** the agent proposes a bounded diagnostic action rather than pretending certainty.
+5. **Approve the consequential action:** the technician remains in control of work-order creation.
+6. **Record the result:** the completed repair becomes durable memory.
+7. **Use it next time:** a differently worded future incident can retrieve the learned experience.
+
+The product therefore preserves technician expertise, reduces repeated dead ends, and keeps AI-assisted actions governed.
+
+## Why AWS is useful here
+
+AWS is not included merely to make the architecture look larger:
+
+- **AWS Amplify Hosting** provides the deployed web application path.
+- **Amazon Bedrock** provides model inference and Titan Text Embeddings V2.
+- **Amazon Bedrock AgentCore Runtime** provides the target managed execution environment for the bounded agent.
+- **AWS tooling/CloudShell** was useful for reproducing deployment and integration failures against the real environment.
+
+The repository records the current evidence honestly: Bedrock reasoning/embedding and the deployed application path are verified; independent AgentCore runtime invocation and some MCP/runtime gates remain explicitly tracked rather than being overstated.
+
+## The real debugging journey
+
+The build included real failures rather than only a happy-path implementation. Examples recorded in the development log include:
+
+- incorrect local PostgreSQL socket assumptions in CloudShell
+- missing TypeScript tooling
+- CloudShell `ENOSPC` disk exhaustion
+- missing runtime environment variables during deterministic seeding
+- Amplify SSR environment-variable visibility problems
+- an AgentCore invocation failure caused by a UUID JSON-serialization boundary
+- runtime-version/deployment-state investigation
+- shell searches accidentally aimed at temporary extraction paths rather than the repository
+
+Each finding was isolated as an environment, integration, or application issue and tracked separately. The repository does not label every failed command as a product bug.
 
 ## Run locally
 
@@ -117,6 +167,8 @@ The repository maintains explicit engineering and release gates in:
 - `QA_RELEASE_GATE.md`
 - `RELEASE_READINESS.md`
 - `SECURITY.md`
+- `docs/DEVELOPMENT_LOG.md`
+- `docs/architecture.md`
 
 The UI is designed for mobile, tablet, laptop, and desktop use. It includes visible keyboard focus, reduced-motion support, touch-friendly navigation, loading/error/empty states, and an approval boundary for consequential actions.
 
