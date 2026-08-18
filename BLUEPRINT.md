@@ -83,7 +83,7 @@ Repair outcomes likewise require an existing open/staged work order and are writ
 
 ## Scope and authentication
 
-The current hackathon deployment uses a server-configured organization scope (`DEMO_ORG_ID`) rather than end-user authentication. This is intentional for the demonstrated MVP but means it is **not yet a general multi-tenant production identity system**.
+The current deployment uses a server-configured organization scope (`DEMO_ORG_ID`) rather than end-user authentication. This is intentional for the demonstrated MVP but means it is **not yet a general multi-tenant production identity system**.
 
 Production hardening would add an identity provider, authenticated sessions, role-based authorization, stronger tenant isolation, and corresponding adversarial tests.
 
@@ -115,6 +115,6 @@ Pending:
 
 1. independent AgentCore deployment/invocation evidence
 2. final security/configuration review
-3. final judge/submission evidence package
+3. final release verification
 
 No additional architecture should be added unless it directly improves one of those release items.
