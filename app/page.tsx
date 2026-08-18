@@ -12,6 +12,11 @@ const logs = [
 ];
 
 const DEFAULT_QUERY='PRESS-204 thermal rise during a long production cycle';
+const EXAMPLES = [
+  'PRESS-204 overheating after 6 hours of production',
+  'Hydraulic pressure dropping after 4 hours',
+  'Motor vibration increased during operation',
+];
 
 export default function Home(){
   const [query,setQuery]=useState(DEFAULT_QUERY);
@@ -50,8 +55,6 @@ export default function Home(){
 
   useEffect(()=>{
     if(!hydrated) return;
-    // On a fresh page load, immediately rehydrate from the live API instead of
-    // rendering demo memory as if it were production state.
     void runDiagnosis(true);
   },[hydrated]);
 
@@ -69,7 +72,6 @@ export default function Home(){
       else if(data.retrievalMode==='cockroachdb-recent') setMessage('CockroachDB memory retrieved without semantic ranking.');
       else setMessage('Bounded demo reasoning active.');
     }catch(error){
-      // Never silently present demo data after a failed live request.
       setMemories([]);
       setRetrievalMode('demo');
       setMessage(`Live diagnosis unavailable: ${error instanceof Error?error.message:'unknown error'}`);
@@ -101,6 +103,11 @@ export default function Home(){
   function showMemory(){
     setTab('memory');
     document.getElementById('memory')?.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
+  function useExample(example:string){
+    setQuery(example);
+    setTimeout(()=>void runDiagnosis(),0);
   }
 
   return <div className="app">
@@ -140,6 +147,48 @@ export default function Home(){
             <div className="footer-note">CockroachDB stores the operational record and vector memory together. No second vector database is required.</div>
           </aside>
         </section>
+
+        <section className="card feature-panel" aria-labelledby="how-it-works">
+          <div className="eyebrow">Start here</div>
+          <div className="card-title" id="how-it-works" style={{fontSize:20,marginTop:6}}>How to use RepairAtlas</div>
+          <p className="muted" style={{fontSize:13,lineHeight:1.6,maxWidth:760,margin:'8px 0 0'}}>You do not need to know AI or databases. Describe the field problem in normal language, review the evidence, and let the technician decide the consequential action.</p>
+          <div className="feature-grid">
+            <div><strong>1 · Describe</strong><p className="muted">Enter the asset and symptom, for example “PRESS-204 overheating after 6 hours.”</p></div>
+            <div><strong>2 · Retrieve & reason</strong><p className="muted">Run diagnosis. RepairAtlas finds similar successful and failed repairs and explains the recommendation.</p></div>
+            <div><strong>3 · Approve & learn</strong><p className="muted">Review evidence, approve the work order, then record the outcome so the next repair can benefit.</p></div>
+          </div>
+          <div style={{marginTop:16}}>
+            <div className="muted" style={{fontSize:11,fontWeight:750,textTransform:'uppercase',letterSpacing:'.1em',marginBottom:8}}>Try an example</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              {EXAMPLES.map(example=><button key={example} className="pill" style={{cursor:'pointer',background:'var(--surface-2)',color:'var(--text)',padding:'9px 11px'}} onClick={()=>useExample(example)}>{example}</button>)}
+            </div>
+          </div>
+        </section>
+
+        <section className="card feature-panel" aria-labelledby="factory-value">
+          <div className="eyebrow">For factory operations</div>
+          <div className="card-title" id="factory-value" style={{fontSize:20,marginTop:6}}>Turn repair experience into operational leverage.</div>
+          <div className="feature-grid">
+            <div><strong>Preserve expertise</strong><p className="muted">A technician’s successful fix becomes searchable knowledge instead of disappearing with the shift.</p></div>
+            <div><strong>Reduce repeat mistakes</strong><p className="muted">Failed interventions remain visible as negative evidence, helping teams avoid repeating expensive dead ends.</p></div>
+            <div><strong>Control risk</strong><p className="muted">The agent can recommend and explain, but consequential operational changes stay behind explicit human approval.</p></div>
+          </div>
+          <div style={{marginTop:14,padding:'13px 14px',borderRadius:14,border:'1px solid rgba(116,215,176,.18)',background:'rgba(116,215,176,.045)',fontSize:13,lineHeight:1.6}}><strong>Business outcome:</strong> faster diagnosis, less unnecessary replacement, and institutional memory that improves with every completed repair.</div>
+        </section>
+
+        <section className="card feature-panel" aria-labelledby="faq">
+          <div className="eyebrow">Quick answers</div>
+          <div className="card-title" id="faq" style={{fontSize:20,marginTop:6}}>RepairAtlas FAQ</div>
+          <div style={{display:'grid',gap:8,marginTop:14}}>
+            <details style={{border:'1px solid var(--border)',borderRadius:12,padding:'12px 14px',background:'rgba(14,19,26,.5)'}}><summary style={{cursor:'pointer',fontWeight:700}}>What is RepairAtlas?</summary><p className="muted" style={{fontSize:12,lineHeight:1.6,margin:'9px 0 0'}}>An agentic maintenance assistant that retrieves previous repair experiences, compares outcomes, reasons over the evidence, and proposes the next safe diagnostic action.</p></details>
+            <details style={{border:'1px solid var(--border)',borderRadius:12,padding:'12px 14px',background:'rgba(14,19,26,.5)'}}><summary style={{cursor:'pointer',fontWeight:700}}>What should I type?</summary><p className="muted" style={{fontSize:12,lineHeight:1.6,margin:'9px 0 0'}}>Describe the asset and symptom in normal language. Include useful context such as when the problem appears, how long the machine has been running, or what changed recently.</p></details>
+            <details style={{border:'1px solid var(--border)',borderRadius:12,padding:'12px 14px',background:'rgba(14,19,26,.5)'}}><summary style={{cursor:'pointer',fontWeight:700}}>How does it learn from repairs?</summary><p className="muted" style={{fontSize:12,lineHeight:1.6,margin:'9px 0 0'}}>A completed repair and its outcome are persisted as operational memory. Future incidents can retrieve that experience semantically, so the system gets more useful as the repair history grows.</p></details>
+            <details style={{border:'1px solid var(--border)',borderRadius:12,padding:'12px 14px',background:'rgba(14,19,26,.5)'}}><summary style={{cursor:'pointer',fontWeight:700}}>Can the AI directly control factory equipment?</summary><p className="muted" style={{fontSize:12,lineHeight:1.6,margin:'9px 0 0'}}>Not in this workflow. Diagnosis and retrieval can be automated, while consequential operational writes remain behind an explicit human approval boundary.</p></details>
+            <details style={{border:'1px solid var(--border)',borderRadius:12,padding:'12px 14px',background:'rgba(14,19,26,.5)'}}><summary style={{cursor:'pointer',fontWeight:700}}>Why keep failed repairs?</summary><p className="muted" style={{fontSize:12,lineHeight:1.6,margin:'9px 0 0'}}>A failed intervention is valuable evidence. RepairAtlas treats it as a reason not to repeat an ineffective path, rather than as an instruction.</p></details>
+            <details style={{border:'1px solid var(--border)',borderRadius:12,padding:'12px 14px',background:'rgba(14,19,26,.5)'}}><summary style={{cursor:'pointer',fontWeight:700}}>Why CockroachDB?</summary><p className="muted" style={{fontSize:12,lineHeight:1.6,margin:'9px 0 0'}}>RepairAtlas keeps transactional repair state and vector-based memory in the same system of record. That makes the operational event and its semantic history easier to keep consistent.</p></details>
+          </div>
+        </section>
+
         <section className="card feature-panel"><div className="eyebrow">Why this is different</div><div className="feature-grid"><div><strong>Remember outcomes</strong><p className="muted">The agent learns from successful and failed interventions, not just conversation history.</p></div><div><strong>Act safely</strong><p className="muted">Reads can be automated; consequential writes stay behind explicit approval.</p></div><div><strong>Keep memory close to truth</strong><p className="muted">Transactional state and semantic experiences live in the same CockroachDB system of record.</p></div></div></section>
       </main>
     </div>
