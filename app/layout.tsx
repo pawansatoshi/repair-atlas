@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import SystemGuideLink from './SystemGuideLink';
 
 export const metadata: Metadata = {
   title: 'RepairAtlas — Institutional memory for field operations',
@@ -11,7 +12,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <SystemGuideLink />
+      </body>
     </html>
   );
 }
