@@ -110,7 +110,83 @@ incident
 → learned retrieval
 ```
 
-### Evidence discipline
+## 2026-08-17 to 2026-08-18 — Production hardening, AgentCore investigation, and judge UX
+
+### What the debugging process taught us
+
+The later build phase was not a straight line from code to demo. We repeatedly validated the actual deployed behavior instead of assuming that a green build meant the agent worked.
+
+Observed issues included:
+
+1. **Amplify runtime configuration boundary:** the Next.js server initially could not see selected app-level environment variables even though the Amplify build had them. We added the SSR environment bridge documented for the deployment path and rechecked the live API.
+2. **AgentCore invocation serialization failure:** a live AgentCore runtime test failed with `TypeError: Object of type UUID is not JSON serializable`. This identified a concrete data-boundary problem in the runtime invocation path. We treated it as a serialization/integration defect, not an AI reasoning defect, and kept independent AgentCore runtime verification as an explicit release gate.
+3. **AgentCore runtime version investigation:** the AWS console was inspected across deployed runtime versions; the latest listed runtime reached `READY` while older versions included `UPDATE_FAILED` states. This was used as deployment evidence, not hidden from the reviewer.
+4. **Repository-vs-temporary-path debugging:** several shell searches were accidentally aimed at temporary extraction directories rather than the repository root. These were corrected and not misreported as application bugs.
+
+### Production behavior subsequently demonstrated
+
+The deployed RepairAtlas application was manually exercised through the golden PRESS-204 scenario:
+
+```text
+PRESS-204 overheating
+      ↓
+retrieve repair memory
+      ↓
+compare successful + failed interventions
+      ↓
+bounded recommendation
+      ↓
+human approval
+      ↓
+diagnostic work order created
+      ↓
+repair outcome recorded
+      ↓
+repair memory persisted
+      ↓
+completed state remains visible after refresh
+```
+
+The live UI showed four relevant memories, including a failed fan replacement and successful airflow/filter interventions. The recommendation favored inspecting airflow before replacing the motor. The work-order action was explicitly approval-gated. The successful outcome was then persisted as durable repair memory and became visible in subsequent retrieval.
+
+### Product / judge-facing improvements
+
+The main product UI was kept operational rather than turned into a documentation page. It now also explains:
+
+- how to describe an incident in normal language
+- how retrieval and reasoning work
+- how to approve and record a repair
+- why failed interventions are useful negative evidence
+- how factory teams can preserve expertise and reduce repeated mistakes
+- what the product does and does not automate
+- a compact FAQ with expandable answers
+- example incident prompts for a first-time judge
+
+A separate interactive architecture/judge page was added at `/architecture`. It lets a reviewer click through the system components, inspect the memory loop, expand the real debugging findings, and read judge-oriented FAQs.
+
+### Current evidence discipline
+
+The repository intentionally distinguishes:
+
+- **Verified:** observed in the deployed application or directly validated in AWS/CockroachDB.
+- **Partial:** implementation/configuration exists but the full end-to-end behavior is not yet independently proven.
+- **Pending:** a release check still required before public submission.
+
+The AgentCore runtime is documented this way rather than being presented as fully verified merely because the project configuration exists.
+
+### Final release principle
+
+The project is not judged by how many AWS services appear in the architecture. AWS is useful here because it provides concrete capabilities: production hosting through Amplify, model inference/embeddings through Bedrock, and a managed agent-runtime path through AgentCore. CockroachDB remains the operational source of truth and durable semantic memory.
+
+The core engineering proof is:
+
+**incident → retrieve → reason → approve → act → record outcome → remember → improve the next incident**.
+
+### Next validation target
+
+Before final submission, rerun the release/security gates after the final code change, verify the final deployment, confirm the remaining AgentCore/MCP status accurately, and capture the golden demo video from the deployed application.
+
+## Evidence discipline
 
 - Keep the roadmap/blueprint and release checklist intact.
 - Record meaningful debugging discoveries here as they happen.
