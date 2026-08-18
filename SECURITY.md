@@ -44,7 +44,7 @@ Controls:
 
 ### Cross-session / tenant contamination
 
-The current hackathon deployment uses a server-configured organization scope (`DEMO_ORG_ID`) and asset-scoped queries. It does **not** implement end-user authentication or a multi-user identity provider yet. Production multi-tenant identity and authorization therefore remain a hardening item rather than a claimed completed control.
+The current deployment uses a server-configured organization scope (`DEMO_ORG_ID`) and asset-scoped queries. It does **not** implement end-user authentication or a multi-user identity provider yet. Production multi-tenant identity and authorization therefore remain a hardening item rather than a claimed completed control.
 
 Controls currently present:
 
@@ -124,4 +124,4 @@ If a credential is exposed:
 
 ## Production hardening roadmap
 
-The hackathon MVP focuses on bounded agent actions, scoped database access, explicit approval, and secret hygiene. Before treating the application as a general multi-tenant production system, add formal end-user authentication/authorization, stronger tenant isolation, penetration testing, compliance requirements, key management, retention policies, and security monitoring.
+The current MVP focuses on bounded agent actions, scoped database access, explicit approval, and secret hygiene. Before treating the application as a general multi-tenant production system, add formal end-user authentication/authorization, stronger tenant isolation, penetration testing, compliance requirements, key management, retention policies, and security monitoring.
