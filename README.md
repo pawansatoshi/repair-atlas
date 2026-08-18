@@ -4,11 +4,11 @@
 
 RepairAtlas is an agentic field-operations console that turns completed repairs into durable operational memory. It retrieves prior repair experiences, distinguishes successful from failed interventions, proposes a bounded next step, keeps consequential writes behind explicit human approval, and persists the outcome so future incidents can use the evidence.
 
-## Judge quick start
+## Quick start
 
 **Live product:** use the deployed application and run the `PRESS-204` overheating scenario.
 
-**Interactive architecture + engineering story:** open [`/architecture`](./app/architecture/page.tsx) in the deployed app. It explains the system in plain language, lets reviewers click through the architecture, shows the memory loop, documents real debugging findings, and includes a judge FAQ.
+**Interactive system guide:** open [`/architecture`](./app/architecture/page.tsx) in the deployed app. It explains the system in plain language, lets you click through the architecture, shows the memory loop, documents real debugging findings, and includes a compact FAQ.
 
 **Engineering evidence:** [`docs/DEVELOPMENT_LOG.md`](./docs/DEVELOPMENT_LOG.md) records the debugging journey, AWS findings, verification status, and the distinction between verified and pending capabilities.
 
@@ -202,9 +202,9 @@ A production health probe also returned successful database connectivity, ready 
 
 These statements describe observed behavior from the current verification session; they are not a claim that the system is bug-free or production-complete in every environment.
 
-## Challenge context
+## Project context
 
-RepairAtlas was developed for the CockroachDB × AWS agentic-memory challenge. The implementation keeps the challenge-relevant technologies tied to concrete product responsibilities rather than adding services only for demonstration value.
+RepairAtlas is built around a real operational problem: factory repair knowledge is often lost between incidents and shifts. The implementation keeps CockroachDB and AWS responsibilities tied to concrete product behavior rather than adding services only for demonstration value.
 
 ## Current release status
 
