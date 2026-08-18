@@ -38,7 +38,7 @@ export default function ArchitecturePage() {
       <div style={{ maxWidth: 1180, margin: '0 auto' }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap', marginBottom: 28 }}>
           <div>
-            <div className="eyebrow">Judge guide · RepairAtlas</div>
+            <div className="eyebrow">System guide · RepairAtlas</div>
             <h1 style={{ fontSize: 'clamp(30px,5vw,52px)', margin: '8px 0 8px', letterSpacing: '-.045em' }}>See how the whole system fits together.</h1>
             <p className="muted" style={{ maxWidth: 760, lineHeight: 1.65, margin: 0 }}>A simple interactive view of the product, the technology, the bugs we actually encountered, and why the architecture matters to a factory.</p>
           </div>
@@ -46,7 +46,7 @@ export default function ArchitecturePage() {
         </header>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-          {([['architecture', 'Architecture'], ['journey', '4-day engineering journey'], ['faq', 'Judge FAQ']] as const).map(([key, label]) => (
+          {([['architecture', 'Architecture'], ['journey', '4-day engineering journey'], ['faq', 'FAQ']] as const).map(([key, label]) => (
             <button key={key} className={`btn ${section === key ? 'primary' : ''}`} onClick={() => setSection(key)}>{label}</button>
           ))}
         </div>
@@ -114,7 +114,7 @@ export default function ArchitecturePage() {
                 ['Day 1', 'Foundation', 'Product contract, CockroachDB memory, embeddings, tests.'],
                 ['Day 2', 'Cloud integration', 'AWS paths, Amplify, environment/runtime boundaries.'],
                 ['Day 3', 'Agent + UX', 'AgentCore path, evidence review, approval boundary, persistent workflow.'],
-                ['Day 4', 'Proof', 'Live retrieval, Bedrock reasoning, work order, outcome, durable memory, judge-facing explanation.'],
+                ['Day 4', 'Proof', 'Live retrieval, Bedrock reasoning, work order, outcome, durable memory, system explanation.'],
               ].map(([day, title, copy]) => <div key={day} className="memory" style={{ border: '1px solid var(--border)' }}><div className="eyebrow">{day}</div><strong style={{ display: 'block', marginTop: 5 }}>{title}</strong><p>{copy}</p></div>)}
             </div>
           </section>
@@ -122,8 +122,8 @@ export default function ArchitecturePage() {
 
         {section === 'faq' && (
           <section className="card" style={{ padding: 20 }}>
-            <div className="eyebrow">Judge-ready answers</div>
-            <h2 style={{ margin: '7px 0 8px', fontSize: 24 }}>The questions we expect.</h2>
+            <div className="eyebrow">Common questions</div>
+            <h2 style={{ margin: '7px 0 8px', fontSize: 24 }}>Questions worth asking about the system.</h2>
             <div style={{ display: 'grid', gap: 8, marginTop: 18 }}>
               {faqs.map(([q, a]) => <details key={q} style={{ border: '1px solid var(--border)', borderRadius: 13, padding: '13px 15px', background: 'rgba(14,19,26,.5)' }}><summary style={{ cursor: 'pointer', fontWeight: 750 }}>{q}</summary><p className="muted" style={{ margin: '9px 0 0', lineHeight: 1.65, fontSize: 13 }}>{a}</p></details>)}
             </div>
