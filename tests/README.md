@@ -1,6 +1,6 @@
 # Testing Strategy
 
-RepairAtlas will use layered testing rather than relying only on the final demo.
+RepairAtlas uses layered testing rather than relying only on the final demo.
 
 ## Unit tests
 
@@ -43,7 +43,7 @@ failure → retrieve → recommend → approve → write → outcome → memory
 
 ## End-to-end test
 
-The golden PRESS-204 scenario must execute against real persistence and the actual deployed model/runtime path used for the demo.
+The golden PRESS-204 scenario must execute against real persistence and the actual deployed model/runtime path used by the application.
 
 ## Fresh-install test
 
@@ -67,6 +67,6 @@ install
 - least-privilege IAM review
 - MCP permission review
 
-## Submission gate
+## Release gate
 
-A release candidate is not ready until all critical tests pass and the full application has been manually reviewed like a hostile hackathon judge.
+A release candidate is not ready until all critical tests pass and the full application has been manually reviewed for correctness, safety, failure handling, and operational clarity.
