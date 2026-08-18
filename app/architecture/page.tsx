@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const nodes = [
   { id: 'ui', label: 'RepairAtlas UI', tech: 'Next.js + React + AWS Amplify', detail: 'The technician describes a field problem, reviews evidence, approves consequential actions, and records the outcome.' },
@@ -31,10 +31,69 @@ const faqs = [
 export default function ArchitecturePage() {
   const [selected, setSelected] = useState('ui');
   const [section, setSection] = useState<'architecture' | 'journey' | 'faq'>('architecture');
+  const [guided, setGuided] = useState(true);
+  const nodeRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const node = nodes.find((item) => item.id === selected) ?? nodes[0];
+  const selectedIndex = Math.max(0, nodes.findIndex((item) => item.id === selected));
+
+  useEffect(() => {
+    if (!guided || section !== 'architecture') return;
+    const timer = window.setInterval(() => {
+      setSelected((current) => {
+        const index = nodes.findIndex((item) => item.id === current);
+        return nodes[(index + 1) % nodes.length].id;
+      });
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [guided, section]);
+
+  useEffect(() => {
+    if (section !== 'architecture') return;
+    nodeRefs.current[selected]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [selected, section]);
+
+  const chooseNode = (id: string) => {
+    setSelected(id);
+    setGuided(false);
+  };
 
   return (
     <main style={{ minHeight: '100vh', padding: '28px 18px 70px', background: 'var(--bg)' }}>
+      <style jsx>{`
+        .node-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-top:22px; }
+        .node-card { border:1px solid var(--border); background:var(--surface-2); color:var(--text); border-radius:16px; padding:15px; text-align:left; min-height:125px; cursor:pointer; transition:transform .25s ease,border-color .25s ease,background .25s ease,box-shadow .25s ease; }
+        .node-card:hover { transform:translateY(-2px); }
+        .node-card.active { border-color:var(--accent); background:rgba(116,215,176,.09); box-shadow:0 0 0 1px rgba(116,215,176,.08),0 10px 30px rgba(0,0,0,.14); }
+        .journey-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+        .loop-grid { display:grid; grid-template-columns:repeat(7,minmax(80px,1fr)); gap:8px; align-items:stretch; }
+        .flow-control { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:18px; padding:10px 12px; border:1px solid var(--border); border-radius:14px; background:rgba(14,19,26,.55); }
+        .progress { height:3px; flex:1; border-radius:999px; background:var(--border); overflow:hidden; }
+        .progress > span { display:block; height:100%; background:var(--accent); transition:width .4s ease; }
+        .dots { display:flex; gap:5px; align-items:center; }
+        .dot { width:6px; height:6px; border-radius:50%; background:var(--border); }
+        .dot.active { background:var(--accent); transform:scale(1.25); }
+        @media (max-width: 900px) {
+          .node-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+          .loop-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+          .journey-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        }
+        @media (max-width: 640px) {
+          .node-grid { display:flex; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; gap:10px; padding:2px 2px 10px; scrollbar-width:none; }
+          .node-grid::-webkit-scrollbar { display:none; }
+          .node-card { flex:0 0 82%; min-height:150px; scroll-snap-align:center; }
+          .loop-grid { display:flex; overflow-x:auto; padding-bottom:6px; scrollbar-width:none; }
+          .loop-grid::-webkit-scrollbar { display:none; }
+          .loop-grid > div { flex:0 0 145px; }
+          .journey-grid { grid-template-columns:1fr; }
+          .flow-control { align-items:flex-start; flex-direction:column; }
+          .flow-control .progress { width:100%; flex:none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .node-card { transition:none; }
+          .progress > span { transition:none; }
+        }
+      `}</style>
+
       <div style={{ maxWidth: 1180, margin: '0 auto' }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap', marginBottom: 28 }}>
           <div>
@@ -55,24 +114,44 @@ export default function ArchitecturePage() {
           <>
             <section className="card" style={{ padding: 20 }}>
               <div className="eyebrow">Interactive architecture</div>
-              <h2 style={{ margin: '7px 0 6px', fontSize: 24 }}>Click a box to understand its job.</h2>
-              <p className="muted" style={{ lineHeight: 1.6, maxWidth: 820 }}>Think of it like a factory team: the UI is the technician, AgentCore is the coordinator, Bedrock is the reasoning engine, and CockroachDB is the long-term memory + source of truth.</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(130px,1fr))', gap: 10, marginTop: 22 }}>
+              <h2 style={{ margin: '7px 0 6px', fontSize: 24 }}>Follow the system path.</h2>
+              <p className="muted" style={{ lineHeight: 1.6, maxWidth: 820 }}>The walkthrough can move through each component automatically, or you can select any component yourself. On a phone, the active component is brought into view so the flow stays readable.</p>
+
+              <div className="flow-control">
+                <div style={{ minWidth: 145 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)' }}>{guided ? 'GUIDED WALKTHROUGH' : 'MANUAL REVIEW'}</div>
+                  <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{guided ? 'Advancing every 3 seconds' : 'Tap a component to inspect it'}</div>
+                </div>
+                <div className="progress" aria-label={`Architecture progress ${selectedIndex + 1} of ${nodes.length}`}><span style={{ width: `${((selectedIndex + 1) / nodes.length) * 100}%` }} /></div>
+                <div className="dots" aria-hidden="true">{nodes.map((item) => <span key={item.id} className={`dot ${item.id === selected ? 'active' : ''}`} />)}</div>
+                <button className={`btn ${guided ? 'primary' : ''}`} onClick={() => setGuided((value) => !value)}>{guided ? 'Pause flow' : 'Play flow'}</button>
+              </div>
+
+              <div className="node-grid">
                 {nodes.map((item, index) => (
-                  <button key={item.id} onClick={() => setSelected(item.id)} style={{ border: selected === item.id ? '1px solid var(--accent)' : '1px solid var(--border)', background: selected === item.id ? 'rgba(116,215,176,.09)' : 'var(--surface-2)', color: 'var(--text)', borderRadius: 16, padding: 15, textAlign: 'left', minHeight: 125 }}>
+                  <button
+                    key={item.id}
+                    ref={(element) => { nodeRefs.current[item.id] = element; }}
+                    className={`node-card ${selected === item.id ? 'active' : ''}`}
+                    onClick={() => chooseNode(item.id)}
+                    aria-current={selected === item.id ? 'step' : undefined}
+                  >
                     <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 800 }}>0{index + 1}</div>
                     <strong style={{ display: 'block', marginTop: 8, lineHeight: 1.25 }}>{item.label}</strong>
                     <span className="muted" style={{ display: 'block', marginTop: 7, fontSize: 11, lineHeight: 1.45 }}>{item.tech}</span>
                   </button>
                 ))}
               </div>
+
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, margin: '16px 0', color: 'var(--muted)', fontSize: 18 }} aria-hidden="true">→ → → →</div>
-              <div style={{ border: '1px solid rgba(116,215,176,.22)', background: 'rgba(116,215,176,.045)', borderRadius: 16, padding: 18 }}>
-                <div className="eyebrow">Selected component</div>
+
+              <div style={{ border: '1px solid rgba(116,215,176,.22)', background: 'rgba(116,215,176,.045)', borderRadius: 16, padding: 18, transition: 'opacity .25s ease' }}>
+                <div className="eyebrow">Step {selectedIndex + 1} of {nodes.length} · Selected component</div>
                 <h3 style={{ margin: '6px 0 4px', fontSize: 19 }}>{node.label}</h3>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 9 }}>{node.tech}</div>
                 <p style={{ margin: 0, lineHeight: 1.65, fontSize: 13 }}>{node.detail}</p>
               </div>
+
               <div style={{ marginTop: 18, display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 12 }}>
                 <div className="memory"><strong>Read</strong><p>Retrieve relevant successful and failed repair experiences.</p></div>
                 <div className="memory"><strong>Reason</strong><p>Use current incident + retrieved evidence to propose a bounded next action.</p></div>
@@ -83,7 +162,7 @@ export default function ArchitecturePage() {
             <section className="card feature-panel" style={{ marginTop: 18 }}>
               <div className="eyebrow">The memory loop</div>
               <h2 style={{ margin: '7px 0 14px', fontSize: 22 }}>Failure → memory → better next decision</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,minmax(80px,1fr))', gap: 8, alignItems: 'stretch' }}>
+              <div className="loop-grid">
                 {['Incident', 'Embed', 'Vector search', 'Compare', 'Recommend', 'Approve', 'Outcome → memory'].map((step, i) => (
                   <div key={step} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 12, padding: '12px 8px', textAlign: 'center', background: 'var(--surface-2)', fontSize: 11, fontWeight: 750 }}>{step}</div>
@@ -109,7 +188,7 @@ export default function ArchitecturePage() {
                 </details>
               ))}
             </div>
-            <div style={{ marginTop: 18, display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10 }}>
+            <div className="journey-grid" style={{ marginTop: 18 }}>
               {[
                 ['Day 1', 'Foundation', 'Product contract, CockroachDB memory, embeddings, tests.'],
                 ['Day 2', 'Cloud integration', 'AWS paths, Amplify, environment/runtime boundaries.'],
